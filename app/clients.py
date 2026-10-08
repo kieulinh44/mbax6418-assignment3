@@ -85,12 +85,26 @@ def chat(system: str, user: str, *, max_tokens: int = 2000, temperature: float =
 
 def chat_json(system: str, user: str, *, max_tokens: int = 2500,
               temperature: float = 0.6, retries: int = 2) -> dict:
-    """Chat completion with tolerated JSON-object parsing."""
-    text = chat(system, user, max_tokens=max_tokens, temperature=temperature,
-                json_mode=True, retries=retries)
-    if isinstance(text, dict):  # already mined from reasoning
-        return text
-    return parse_json(text)
+    """Chat completion with tolerated JSON-object parsing.
+
+    The Qwen reasoning model sometimes runs out of budget mid-object
+    (finish=length) and returns truncated JSON, so an unparseable answer
+    triggers a retry with a larger token budget.
+    """
+    last_err: Exception | None = None
+    for attempt in range(retries + 1):
+        text = chat(system, user, max_tokens=max_tokens, temperature=temperature,
+                    json_mode=True, retries=1)
+        if isinstance(text, dict):  # already mined from reasoning
+            return text
+        try:
+            return parse_json(text)
+        except ValueError as exc:
+            last_err = exc
+            log.warning("chat_json parse failed (attempt %d): %s; retrying "
+                        "with +2000 tokens", attempt + 1, str(exc)[:120])
+            max_tokens += 2000
+    raise RuntimeError(f"chat_json failed: {last_err}")
 
 
 def parse_json(text: str) -> dict:

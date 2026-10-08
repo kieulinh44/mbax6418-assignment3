@@ -87,3 +87,8 @@ def health() -> dict:
             entry["error"] = str(exc)[:100]
         checks.append(entry)
     return {"all_ok": all(c["ok"] for c in checks), "services": checks}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app.main:app", host="127.0.0.1", port=config.PORT)

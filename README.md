@@ -32,7 +32,39 @@ A "jam" session is one customizable set:
 Sessions are generated in a background thread; the page polls progress and plays when ready.
 Artifacts live in `sessions/<id>/` (gitignored) alongside a `manifest.json` playlist.
 
-## Run
+## Deploy from the ZIP (grader checklist)
+
+The submission is self-contained: no credentials, no generated media, no
+third-party content — everything the app needs comes from the class endpoints.
+
+1. **Unzip** the submission. (No `.env`, no `sessions/` — by design.)
+2. **Create the environment** (once):
+   - Windows: `python -m venv .venv`
+   - macOS/Linux: `python3 -m venv .venv`
+3. **Install dependencies**:
+   - Windows: `.venv\Scripts\python -m pip install -r requirements.txt`
+   - macOS/Linux: `.venv/bin/python -m pip install -r requirements.txt`
+4. **Credentials**: copy `.env.example` to `.env` and set `AIJ_API_KEY` to the
+   key from `class-endpoints.txt` (or export it as an environment variable).
+5. **Run**:
+   - Windows: double-click `start.bat`
+   - macOS/Linux: `./start.sh`
+   - or directly: `python -m uvicorn app.main:app --port 8000`
+   - Port override: set `AIJ_PORT` (e.g. `AIJ_PORT=8080`).
+6. **Open** http://127.0.0.1:8000 — the four header lights should be green.
+7. **Test the three core features** — either from the UI (pick a vibe, hit
+   "Start the jam": songs + covers + DJ commentary in one set), or automated:
+
+   ```bash
+   .venv/Scripts/python scripts/smoke_test.py          # Windows
+   .venv/bin/python scripts/smoke_test.py              # macOS/Linux
+   ```
+
+   The smoke test creates a real 1–2 song set and prints PASS/FAIL per feature:
+   song generation (ACE-Step), cover art (FLUX), DJ commentary (Chatterbox),
+   and playlist order. Exit code 0 = all pass.
+
+## Run (developer shorthand)
 
 ```bash
 python -m venv .venv
@@ -40,8 +72,9 @@ python -m venv .venv
 .venv/Scripts/python -m uvicorn app.main:app --port 8000
 ```
 
-Open http://localhost:8000 — status lights in the header show whether all four class
-services are reachable.
+Open http://localhost:8000 — status lights in the header show whether all four
+class services are reachable, and `scripts/smoke_test.py` automates the
+three-feature verification (see "Deploy from the ZIP").
 
 ## Layout
 
@@ -55,6 +88,9 @@ app/
   djs.py      DJ script writing (Qwen) + speech (Chatterbox)
   jukebox.py  background session builder (playlist manifest)
   static/     player UI (index.html, style.css, app.js)
+scripts/
+  smoke_test.py   automated three-feature verification (grader-friendly)
+start.bat / start.sh   one-command launchers (venv + install + run)
 sessions/     generated audio/art/playlists (gitignored)
 ```
 

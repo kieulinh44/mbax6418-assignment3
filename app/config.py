@@ -34,6 +34,9 @@ TTS_VOICE     = os.environ.get("AIJ_TTS_VOICE", "default")
 # and the README's "Credentials & safeguards" section.
 API_KEY = os.environ.get("AIJ_API_KEY", "")
 
+# Server port (override with AIJ_PORT so any machine can pick a free one)
+PORT = int(os.environ.get("AIJ_PORT", "8000"))
+
 # --- Generation defaults (safe, quick, demo-friendly) -------------------------
 DEFAULT_DURATION = 30   # seconds per song (ACE-Step allows 10-600)
 DEFAULT_TRACKS = 3
