@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# Generated artifacts (songs, art, DJ clips — all regenerable)
+sessions/
+generated/
+*.wav
+*.mp3
+*.png
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
