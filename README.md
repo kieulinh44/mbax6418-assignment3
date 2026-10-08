@@ -31,6 +31,8 @@ A "jam" session is one customizable set:
 
 Sessions are generated in a background thread; the page polls progress and plays when ready.
 Artifacts live in `sessions/<id>/` (gitignored) alongside a `manifest.json` playlist.
+The player UI supports **light and dark mode** (topbar toggle; remembers your choice;
+defaults to the system preference).
 
 ## Deploy from the ZIP (grader checklist)
 

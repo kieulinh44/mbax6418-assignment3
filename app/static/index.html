@@ -6,11 +6,22 @@
   <title>AI Jukebox</title>
   <link rel="stylesheet" href="/static/style.css"/>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>"/>
+  <script>
+    /* Apply saved (or system) theme before first paint to avoid flashing */
+    try {
+      var t = localStorage.getItem("aij-theme") ||
+        (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", t);
+    } catch (e) { /* private mode etc. — default dark */ }
+  </script>
 </head>
 <body>
   <header class="topbar">
     <div class="brand"><span class="eq">◉</span> AI&nbsp;JUKEBOX</div>
-    <div class="lights" id="status-lights" title="Class service health"></div>
+    <div class="top-right">
+      <button id="theme-toggle" class="theme-toggle" aria-label="Toggle light/dark mode" title="Toggle light/dark mode"></button>
+      <div class="lights" id="status-lights" title="Class service health"></div>
+    </div>
   </header>
 
   <main class="layout">

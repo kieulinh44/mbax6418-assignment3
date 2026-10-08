@@ -18,6 +18,27 @@ const els = {
 
 const session = { id: null, pollTimer: null, manifest: null, idx: -1 };
 
+/* ---------------- theme ---------------- */
+
+const themeToggle = $("theme-toggle");
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  themeToggle.textContent = theme === "dark" ? "☀️" : "🌙";
+}
+
+function initTheme() {
+  const current = document.documentElement.getAttribute("data-theme") === "light"
+    ? "light" : "dark";
+  applyTheme(current); // sets the button icon to match the attribute applied in <head>
+  themeToggle.addEventListener("click", () => {
+    const next = document.documentElement.getAttribute("data-theme") === "dark"
+      ? "light" : "dark";
+    try { localStorage.setItem("aij-theme", next); } catch (_) { /* ignore */ }
+    applyTheme(next);
+  });
+}
+
 async function api(path, opts) {
   const r = await fetch(path, opts);
   if (!r.ok) {
@@ -31,6 +52,7 @@ async function api(path, opts) {
 /* ---------------- boot ---------------- */
 
 async function boot() {
+  initTheme();
   try {
     const p = await api("/api/presets");
     fillSelect(els.genre, p.genres.map(v => ({ value: v, label: v })), "synthwave");

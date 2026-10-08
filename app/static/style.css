@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   --bg: #0b0e14;
   --panel: #121724;
   --panel-2: #181f31;
@@ -11,7 +12,33 @@
   --ok: #34d399;
   --err: #f87171;
   --warn: #fbbf24;
+  --topbar-bg: rgba(11, 14, 20, .8);
+  --accent-text: #081018;
   --grad: linear-gradient(90deg, var(--cyan), var(--violet), var(--magenta));
+}
+
+/* Light theme — same neon character, lighter surfaces */
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f1f4fa;
+  --panel: #ffffff;
+  --panel-2: #eef2f9;
+  --line: #d8dfee;
+  --text: #1b2233;
+  --muted: #5b6579;
+  --cyan: #0891b2;
+  --magenta: #c026d3;
+  --violet: #6366f1;
+  --ok: #059669;
+  --err: #dc2626;
+  --warn: #d97706;
+  --topbar-bg: rgba(255, 255, 255, .85);
+  --accent-text: #ffffff;
+  --grad: linear-gradient(90deg, var(--cyan), var(--violet), var(--magenta));
+}
+
+body, .panel, .topbar, .lib-list li, .queue li, .lyrics pre {
+  transition: background-color .25s ease, border-color .25s ease, color .25s ease;
 }
 
 * { box-sizing: border-box; }
@@ -31,7 +58,7 @@ body {
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 26px;
   border-bottom: 1px solid var(--line);
-  background: rgba(11, 14, 20, .8);
+  background: var(--topbar-bg);
   backdrop-filter: blur(6px);
   position: sticky; top: 0; z-index: 5;
 }
@@ -46,6 +73,14 @@ body {
 .lights .dot.ok { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
 .lights .dot.bad { background: var(--err); box-shadow: 0 0 8px var(--err); }
 .lights .dot::after { content: attr(data-name); position: absolute; display: none; }
+
+.theme-toggle {
+  border: 1px solid var(--line); background: var(--panel); color: var(--text);
+  border-radius: 9px; width: 36px; height: 36px; font-size: 16px; cursor: pointer;
+  display: grid; place-items: center; transition: all .15s;
+}
+.theme-toggle:hover { border-color: var(--violet); }
+.top-right { display: flex; align-items: center; gap: 12px; }
 
 .layout {
   display: grid; grid-template-columns: 340px 1fr; gap: 22px;
@@ -76,7 +111,7 @@ body {
 .primary {
   margin-top: 6px; padding: 13px 16px; font-size: 15px; font-weight: 700;
   border: 0; border-radius: 11px; cursor: pointer; letter-spacing: .04em;
-  color: #081018; background: var(--grad);
+  color: var(--accent-text); background: var(--grad);
   box-shadow: 0 6px 20px rgba(129, 140, 248, .35);
   transition: transform .12s ease, box-shadow .12s ease, filter .12s;
 }
