@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>AI Jukebox</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>"/>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="eq">◉</span> AI&nbsp;JUKEBOX</div>
+    <div class="lights" id="status-lights" title="Class service health"></div>
+  </header>
+
+  <main class="layout">
+    <!-- Control panel -->
+    <section class="panel controls">
+      <h2>Create a set</h2>
+
+      <label class="field">Genre
+        <select id="genre"></select>
+      </label>
+
+      <label class="field">Mood
+        <select id="mood"></select>
+      </label>
+
+      <label class="field">Tempo
+        <div class="slider-row">
+          <input type="range" id="bpm" min="0" max="170" value="0" step="1"/>
+          <span class="val" id="bpm-val">auto</span>
+        </div>
+      </label>
+
+      <label class="field">Theme <input type="text" id="theme" placeholder="e.g. midnight road trip"/></label>
+
+      <label class="field check"><input type="checkbox" id="vocals" checked/> Vocals (singable lyrics)</label>
+
+      <label class="field">Songs in the set
+        <div class="slider-row">
+          <input type="range" id="tracks" min="1" max="8" value="3"/>
+          <span class="val" id="tracks-val">3</span>
+        </div>
+      </label>
+
+      <label class="field">Song length
+        <div class="slider-row">
+          <input type="range" id="duration" min="10" max="120" value="30" step="5"/>
+          <span class="val" id="duration-val">30s</span>
+        </div>
+      </label>
+
+      <label class="field">DJ persona
+        <select id="dj"></select>
+      </label>
+
+      <button id="jam-btn" class="primary">⚡ Start the jam</button>
+      <p class="hint">Composes songs, paints covers and writes live DJ commentary with the MBAX&nbsp;6418 class AI services.</p>
+    </section>
+
+    <!-- Player deck -->
+    <section class="panel deck">
+      <div class="deck-status" id="deck-status">Pick a vibe and hit <b>Start the jam</b>.</div>
+
+      <div class="stage">
+        <div class="vinyl" id="vinyl"></div>
+        <div class="album">
+          <img id="art" src="" alt="album art"/>
+          <div class="art-fallback" id="art-fallback">◉</div>
+        </div>
+      </div>
+
+      <div class="now">
+        <div class="kind" id="kind">—</div>
+        <div class="title" id="title">AI Jukebox</div>
+        <div class="artist" id="artist">—</div>
+      </div>
+
+      <div class="progress"><div class="bar" id="bar"></div></div>
+
+      <button id="play-btn" class="primary play" hidden>▶ Play the set</button>
+
+      <audio id="player" preload="metadata"></audio>
+
+      <ul class="queue" id="queue"></ul>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
