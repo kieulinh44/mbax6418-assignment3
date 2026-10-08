@@ -11,14 +11,15 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import config, djs, jukebox
+from . import config, djs, jukebox, library
 from .clients import SESSION
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
-app = FastAPI(title="AI Jukebox", version="0.1.0")
+app = FastAPI(title="AI Jukebox", version="0.2.0")
 
 app.mount("/sessions", StaticFiles(directory=jukebox.SESSIONS_DIR), name="sessions")
+app.mount("/library", StaticFiles(directory=library.LIBRARY_DIR), name="library")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
@@ -46,6 +47,23 @@ def jam(opts: JamOptions) -> dict:
         options["dj_persona"] = "neon_nina"
     sid = jukebox.start(options)
     return {"id": sid}
+
+
+@app.post("/api/custom-song")
+def custom_song(opts: JamOptions) -> dict:
+    """Generate ONE song (style/mood/duration/vocals from the request) and add
+    it to the library. Runs through the same pipeline as a jam."""
+    options = opts.model_dump()
+    options["tracks"] = 1
+    options["dj_persona"] = "neon_nina"  # DJ clips don't matter for a single song
+    sid = jukebox.start(options)
+    return {"id": sid}
+
+
+@app.get("/api/library")
+def library_list() -> dict:
+    """All generated songs, newest first (persistent across restarts)."""
+    return {"tracks": library.list_tracks()}
 
 
 @app.get("/api/session/{sid}")

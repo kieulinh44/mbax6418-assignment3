@@ -86,6 +86,7 @@ app/
   songs.py    Qwen song composer (customization -> production spec)
   art.py      FLUX cover-art generation
   djs.py      DJ script writing (Qwen) + speech (Chatterbox)
+  library.py  persistent track library (index + copied artifacts, gitignored)
   jukebox.py  background session builder (playlist manifest)
   static/     player UI (index.html, style.css, app.js)
 scripts/
@@ -93,6 +94,15 @@ scripts/
 start.bat / start.sh   one-command launchers (venv + install + run)
 sessions/     generated audio/art/playlists (gitignored)
 ```
+
+## Feature checklist (rubric mapping)
+
+| Requirement | Where it lives |
+|---|---|
+| Choose a song's style, mood, duration | controls panel (genre · mood · tempo · theme · song length · vocals) + "Generate one song" button / `POST /api/custom-song` |
+| Generate playable audio with ACE-Step | every song is rendered by ACE-Step (9007) — see `app/clients.py:generate_song` |
+| Add it to the library | every generated song is auto-added to the persistent library (`app/library.py`, index in `library/tracks.json`); browsable & playable in the Library panel |
+| Instrumental + vocal tracks, AI lyrics for vocal | "Vocals" toggle; vocal tracks get full Qwen-written lyrics with section tags, shown in the player (🎤 Lyrics) |
 
 ## Credentials & safeguards
 

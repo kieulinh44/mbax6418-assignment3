@@ -5,8 +5,9 @@ __pycache__/
 venv/
 .env
 
-# Generated artifacts (songs, art, DJ clips — all regenerable)
+# Generated artifacts (songs, art, DJ clips, library — all regenerable)
 sessions/
+library/
 generated/
 *.wav
 *.mp3

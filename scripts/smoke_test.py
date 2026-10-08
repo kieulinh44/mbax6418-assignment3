@@ -165,6 +165,23 @@ def main() -> int:
           f"({len(intros)} intro, {len(chats)} interludes, {len(outros)} outro)",
           dj_ok and intros and outros and chats)
 
+    # --- library (rubric: "add it to the library") --------------------------------
+    code, data = http_get(f"{base}/api/library")
+    lib_tracks: list = []
+    if code == 200:
+        try:
+            lib_tracks = json.loads(data).get("tracks", [])
+        except Exception:  # noqa: BLE001
+            pass
+    lib_ok = len(lib_tracks) >= args.tracks
+    if lib_ok:
+        newest = lib_tracks[0]
+        code, body = http_get(f"{base}{newest['audio_url']}")
+        lib_ok = code == 200 and len(body) > 10_000 and body.startswith(b"ID3")
+    check(f"Generated songs added to the persistent library ({len(lib_tracks)} "
+          f"of {args.tracks}+ present, newest playable)",
+          lib_ok, ", ".join(f"{t['title']} by {t['artist']}" for t in lib_tracks[:2]) or "empty")
+
     # --- playback order -------------------------------------------------------------
     order = [i["kind"] for i in playlist]
     expected = ["intro"] + ["song", "chat"] * len(songs)

@@ -56,7 +56,9 @@
       </label>
 
       <button id="jam-btn" class="primary">⚡ Start the jam</button>
-      <p class="hint">Composes songs, paints covers and writes live DJ commentary with the MBAX&nbsp;6418 class AI services.</p>
+      <button id="single-btn" class="secondary">🎵 Generate one song → library</button>
+      <p class="hint">"Start the jam" builds a full DJ set; "one song" uses the same style / mood / duration / vocals and saves the track to your library.</p>
+      <p class="hint">All content is generated live by the MBAX&nbsp;6418 class AI services.</p>
     </section>
 
     <!-- Player deck -->
@@ -84,6 +86,16 @@
       <audio id="player" preload="metadata"></audio>
 
       <ul class="queue" id="queue"></ul>
+
+      <details class="lyrics" id="lyrics-box" hidden>
+        <summary>🎤 Lyrics</summary>
+        <pre id="lyrics-text"></pre>
+      </details>
+
+      <section class="library">
+        <h3>Library <span class="count" id="library-count"></span></h3>
+        <ul class="lib-list" id="library-list"></ul>
+      </section>
     </section>
   </main>
 

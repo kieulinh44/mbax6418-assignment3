@@ -17,6 +17,7 @@ from pathlib import Path
 from . import art as art_mod
 from . import config
 from . import djs as djs_mod
+from . import library as library_mod
 from . import songs as songs_mod
 
 log = logging.getLogger("aijukebox.jukebox")
@@ -115,7 +116,14 @@ def _build(sid: str, options: dict, total: int) -> None:
                 "lyrics": spec["lyrics"],
             })
 
-        # 3) DJ script + speech -------------------------------------------------
+        # 3) add every song to the persistent library (rubric requirement) ----
+        for i, t in enumerate(tracks):
+            art_path = sdir / f"cover_{i + 1}.png"
+            library_mod.add(t, sdir / f"song_{i + 1}.mp3",
+                            art_path if art_path.exists() else None,
+                            session_id=sid, options=options)
+
+        # 4) DJ script + speech -------------------------------------------------
         steps += 1
         _update(sid, progress={"stage": "writing DJ script", "done": steps})
         persona = options.get("dj_persona", "neon_nina")
@@ -128,7 +136,7 @@ def _build(sid: str, options: dict, total: int) -> None:
             (sdir / f"dj_chat_{i + 1}.mp3").write_bytes(clip)
         (sdir / "dj_outro.mp3").write_bytes(speech["outro"])
 
-        # 4) assemble the playlist manifest ------------------------------------
+        # 5) assemble the playlist manifest ------------------------------------
         playlist: list[dict] = [{
             "kind": "intro",
             "title": "Welcome to the AI Jukebox",
