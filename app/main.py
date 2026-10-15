@@ -52,10 +52,10 @@ def jam(opts: JamOptions) -> dict:
 @app.post("/api/custom-song")
 def custom_song(opts: JamOptions) -> dict:
     """Generate ONE song (style/mood/duration/vocals from the request) and add
-    it to the library. Runs through the same pipeline as a jam."""
+    it to the library. Skips DJ commentary — a single song is just song + cover."""
     options = opts.model_dump()
     options["tracks"] = 1
-    options["dj_persona"] = "neon_nina"  # DJ clips don't matter for a single song
+    options["custom_single"] = True
     sid = jukebox.start(options)
     return {"id": sid}
 

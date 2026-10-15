@@ -13,7 +13,7 @@ const els = {
   player: $("player"), queue: $("queue"), lights: $("status-lights"),
   singleBtn: $("single-btn"), libraryList: $("library-list"),
   lyricsBox: $("lyrics-box"), lyricsText: $("lyrics-text"),
-  libraryCount: $("library-count"),
+  libraryCount: $("library-count"), pauseBtn: $("pause-btn"),
 };
 
 const session = { id: null, pollTimer: null, manifest: null, idx: -1 };
@@ -89,7 +89,10 @@ function bind() {
   els.jamBtn.addEventListener("click", startJam);
   els.singleBtn.addEventListener("click", () => startJam(true));
   els.playBtn.addEventListener("click", playSet);
-  els.player.addEventListener("ended", next);
+  els.pauseBtn.addEventListener("click", togglePause);
+  els.player.addEventListener("ended", onEnded);
+  els.player.addEventListener("play", () => els.pauseBtn.textContent = "⏸");
+  els.player.addEventListener("pause", () => els.pauseBtn.textContent = "▶");
   els.player.addEventListener("timeupdate", () => {
     if (els.player.duration) {
       els.bar.style.width = (els.player.currentTime / els.player.duration * 100) + "%";
@@ -113,13 +116,14 @@ async function startJam(single) {
   };
   setControls(false);
   els.playBtn.hidden = true;
+  els.pauseBtn.hidden = true;
   els.queue.innerHTML = "";
   renderQueuePlaceholder(options.tracks);
   els.deckStatus.innerHTML = single
     ? `<span class="spin">◉</span> Composing your song — hang tight…`
     : `<span class="spin">◉</span> Composing songs — hang tight, this takes a minute or two…`;
   try {
-    const r = await api("/api/jam", {
+    const r = await api(single ? "/api/custom-song" : "/api/jam", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(options),
     });
@@ -145,7 +149,8 @@ async function poll() {
   let s;
   try { s = await api("/api/session/" + session.id); }
   catch (e) {
-    els.deckStatus.innerHTML = `<span class="err">✕</span> ${escapeHtml(e.message)}`;
+    // transient network blip — keep going, don't scare the listener
+    els.deckStatus.innerHTML = `<span class="spin">◉</span> Reconnecting…`;
     return;
   }
   const p = s.progress;
@@ -156,9 +161,10 @@ async function poll() {
     clearInterval(session.pollTimer); session.pollTimer = null;
     session.manifest = s.manifest;
     refreshLibrary();
+    const n = s.manifest.playlist.length;
     els.deckStatus.innerHTML = "Set is ready — 100%";
     els.playBtn.hidden = false;
-    els.playBtn.textContent = `▶ Play the set (${s.manifest.playlist.length} clips)`;
+    els.playBtn.textContent = n === 1 ? "▶ Play the song" : `▶ Play the set (${n} clips)`;
     renderQueue(s.manifest.playlist);
     setControls(true);
   } else if (s.state === "error") {
@@ -188,6 +194,24 @@ function renderQueue(playlist) {
 function playSet() {
   session.idx = -1;
   els.playBtn.hidden = true;
+  els.pauseBtn.hidden = false;
+  next();
+}
+
+function togglePause() {
+  if (els.player.paused) {
+    els.player.play().catch(() => { /* autoplay blocked — Resume flow covers it */ });
+  } else {
+    els.player.pause();
+  }
+}
+
+function onEnded() {
+  if (!session.manifest) { // a lone library track finished — nothing queued
+    els.pauseBtn.hidden = true;
+    els.deckStatus.textContent = "Playback finished.";
+    return;
+  }
   next();
 }
 
@@ -198,6 +222,7 @@ function next() {
   if (session.idx >= items.length) {
     els.deckStatus.textContent = "Set finished — thanks for listening!";
     els.bar.style.width = "0%";
+    els.pauseBtn.hidden = true;
     els.vinyl.classList.remove("spin");
     return;
   }
@@ -285,6 +310,8 @@ function playLibraryTrack(t) {
   [...els.queue.children].forEach(li => li.classList.remove("current", "playing", "done"));
   els.player.src = t.audio_url;
   els.vinyl.classList.add("spin");
+  els.playBtn.hidden = true;
+  els.pauseBtn.hidden = false;
   setNowPlaying({ kind: "song", title: t.title, artist: t.artist, art: t.art_url, lyrics: t.lyrics });
   els.player.play().catch(() => {
     els.deckStatus.textContent = "⚠ Click ▶ Resume to start playback.";
@@ -313,7 +340,9 @@ async function health() {
 
 function setControls(on) {
   els.jamBtn.disabled = !on;
+  els.singleBtn.disabled = !on;
   els.jamBtn.textContent = on ? "⚡ Start the jam" : "⚡ Jamming…";
+  els.singleBtn.textContent = on ? "🎵 Generate one song → library" : "🎵 Generating…";
 }
 
 function escapeHtml(s) {

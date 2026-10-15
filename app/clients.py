@@ -42,9 +42,13 @@ def _post_json(url: str, payload: dict, timeout: int = _TIMEOUT) -> dict:
 
 def chat(system: str, user: str, *, max_tokens: int = 2000, temperature: float = 0.7,
          json_mode: bool = False, retries: int = 2) -> str:
-    """Single chat completion, retried. The Qwen model spends a LOT of output
-    budget on hidden reasoning, so keep ``max_tokens`` generous and grow it on
-    every retry; as a last resort, mine the answer out of the reasoning field."""
+    """Single chat completion, retried.
+
+    The Qwen model's hidden reasoning used to burn 4k-9k tokens (and 40-70s)
+    per call and would truncate before writing the answer. We disable thinking
+    via ``enable_thinking: false`` (verified on the class endpoint: ~1s replies,
+    answer in ``content``). The retry/mine-from-reasoning paths are fallbacks.
+    """
     payload = {
         "model": config.CHAT_MODEL,
         "messages": [
@@ -53,6 +57,7 @@ def chat(system: str, user: str, *, max_tokens: int = 2000, temperature: float =
         ],
         "max_tokens": max_tokens,
         "temperature": temperature,
+        "chat_template_kwargs": {"enable_thinking": False},
     }
     if json_mode:
         payload["response_format"] = {"type": "json_object"}

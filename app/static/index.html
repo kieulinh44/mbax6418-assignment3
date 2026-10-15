@@ -92,7 +92,10 @@
 
       <div class="progress"><div class="bar" id="bar"></div></div>
 
-      <button id="play-btn" class="primary play" hidden>▶ Play the set</button>
+      <div class="transport">
+        <button id="pause-btn" class="pause" hidden title="Pause / resume">⏸</button>
+        <button id="play-btn" class="primary play" hidden>▶ Play the set</button>
+      </div>
 
       <audio id="player" preload="metadata"></audio>
 

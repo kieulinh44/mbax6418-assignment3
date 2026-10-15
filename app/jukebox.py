@@ -37,13 +37,15 @@ def start(options: dict) -> str:
     sid = uuid.uuid4().hex[:12]
     (SESSIONS_DIR / sid).mkdir(parents=True, exist_ok=True)
     total = int(options.get("tracks", config.DEFAULT_TRACKS))
+    custom_single = bool(options.get("custom_single"))
+    units = total * 2 + (0 if custom_single else 2)  # songs+covers (+DJ if a set)
     with _lock:
         _sessions[sid] = {
             "id": sid,
             "state": "queued",
             "error": None,
             "options": options,
-            "progress": {"stage": "queued", "done": 0, "total": total * 2 + 2},
+            "progress": {"stage": "queued", "done": 0, "total": units},
             "manifest": None,
         }
     threading.Thread(target=_build, args=(sid, options, total), daemon=True).start()
@@ -70,8 +72,9 @@ def _update(sid: str, **fields) -> None:
 
 def _build(sid: str, options: dict, total: int) -> None:
     sdir = SESSIONS_DIR / sid
+    custom_single = bool(options.get("custom_single"))
     steps = 0  # monotonic work counter for progress
-    units = total * 2 + 2  # songs + covers + DJ script + DJ voice
+    units = total * 2 + (0 if custom_single else 2)  # songs+covers (+DJ if a set)
     try:
         _update(sid, state="working",
                 progress={"stage": "composing songs", "done": 0, "total": units})
@@ -123,43 +126,47 @@ def _build(sid: str, options: dict, total: int) -> None:
                             art_path if art_path.exists() else None,
                             session_id=sid, options=options)
 
-        # 4) DJ script + speech -------------------------------------------------
-        steps += 1
-        _update(sid, progress={"stage": "writing DJ script", "done": steps})
+        # 4) DJ script + speech (sets only — a single custom song skips DJ)
         persona = options.get("dj_persona", "neon_nina")
-        script = djs_mod.script_for(persona, tracks, options)
-        steps += 1
-        _update(sid, progress={"stage": "recording DJ voice", "done": steps})
-        speech = djs_mod.render_script(script, persona)
-        (sdir / "dj_intro.mp3").write_bytes(speech["intro"])
-        for i, clip in enumerate(speech["tracks"]):
-            (sdir / f"dj_chat_{i + 1}.mp3").write_bytes(clip)
-        (sdir / "dj_outro.mp3").write_bytes(speech["outro"])
+        if not custom_single:
+            steps += 1
+            _update(sid, progress={"stage": "writing DJ script", "done": steps})
+            script = djs_mod.script_for(persona, tracks, options)
+            steps += 1
+            _update(sid, progress={"stage": "recording DJ voice", "done": steps})
+            speech = djs_mod.render_script(script, persona)
+            (sdir / "dj_intro.mp3").write_bytes(speech["intro"])
+            for i, clip in enumerate(speech["tracks"]):
+                (sdir / f"dj_chat_{i + 1}.mp3").write_bytes(clip)
+            (sdir / "dj_outro.mp3").write_bytes(speech["outro"])
 
         # 5) assemble the playlist manifest ------------------------------------
-        playlist: list[dict] = [{
-            "kind": "intro",
-            "title": "Welcome to the AI Jukebox",
-            "artist": options.get("dj_persona", "DJ"),
-            "audio": f"/sessions/{sid}/dj_intro.mp3",
-            "meta": {},
-        }]
-        for i, t in enumerate(tracks):
-            playlist.append(t)
+        if custom_single:
+            playlist = list(tracks)  # just the song(s)
+        else:
+            playlist: list[dict] = [{
+                "kind": "intro",
+                "title": "Welcome to the AI Jukebox",
+                "artist": options.get("dj_persona", "DJ"),
+                "audio": f"/sessions/{sid}/dj_intro.mp3",
+                "meta": {},
+            }]
+            for i, t in enumerate(tracks):
+                playlist.append(t)
+                playlist.append({
+                    "kind": "chat",
+                    "title": "DJ interlude",
+                    "artist": persona,
+                    "audio": f"/sessions/{sid}/dj_chat_{i + 1}.mp3",
+                    "meta": {},
+                })
             playlist.append({
-                "kind": "chat",
-                "title": "DJ interlude",
+                "kind": "outro",
+                "title": "Thanks for listening",
                 "artist": persona,
-                "audio": f"/sessions/{sid}/dj_chat_{i + 1}.mp3",
+                "audio": f"/sessions/{sid}/dj_outro.mp3",
                 "meta": {},
             })
-        playlist.append({
-            "kind": "outro",
-            "title": "Thanks for listening",
-            "artist": persona,
-            "audio": f"/sessions/{sid}/dj_outro.mp3",
-            "meta": {},
-        })
 
         manifest = {
             "id": sid,
