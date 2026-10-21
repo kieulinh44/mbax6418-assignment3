@@ -90,7 +90,8 @@ app/
   djs.py      DJ script writing (Qwen) + speech (Chatterbox)
   library.py  persistent track library (index + copied artifacts, gitignored)
   jukebox.py  background session builder (playlist manifest)
-  static/     player UI (index.html, style.css, app.js)
+  static/     retro cabinet player UI (index.html, retro.css, app.js)
+    fonts/    locally hosted Barlow + Fraunces fonts and OFL licenses
 scripts/
   smoke_test.py   automated three-feature verification (grader-friendly)
 start.bat / start.sh   one-command launchers (venv + install + run)
@@ -105,6 +106,34 @@ sessions/     generated audio/art/playlists (gitignored)
 | Generate playable audio with ACE-Step | every song is rendered by ACE-Step (9007) — see `app/clients.py:generate_song` |
 | Add it to the library | every generated song is auto-added to the persistent library (`app/library.py`, index in `library/tracks.json`); browsable & playable in the Library panel |
 | Instrumental + vocal tracks, AI lyrics for vocal | "Vocals" toggle; vocal tracks get full Qwen-written lyrics with section tags, shown in the player (🎤 Lyrics) |
+
+## Retro cabinet interface
+
+The interface draws on vintage jukebox materials: walnut grain, brass trim,
+cream record labels, and coral/amber/turquoise fluorescent tubing. Fraunces is
+used for display headings and Barlow for readable controls. Fonts are bundled
+locally under their SIL Open Font Licenses; no font CDN is needed at runtime.
+The Daylight / After hours switch persists the light/dark preference.
+
+The desktop layout separates creation, playback, and the saved collection.
+Tablet and mobile layouts reflow without horizontal scrolling. Keyboard focus,
+a skip link, named playback buttons, live status announcements, accessible
+progress values, and reduced-motion support are included.
+
+### Frontend regression tests
+
+With the app running on port 8003 (or set `AIJ_TEST_URL` to its URL):
+
+```bash
+uv pip install --python .venv/bin/python -r requirements-dev.txt
+.venv/bin/python -m playwright install chromium
+.venv/bin/python -m unittest discover -s tests -v
+```
+
+The browser tests use explicitly intercepted API fixtures for deterministic
+UI-state checks and a silent WAV for real browser pause/resume testing; they
+do not call the AI services. Use `scripts/smoke_test.py --base URL` separately
+for real end-to-end music, cover art, and DJ generation.
 
 ## Credentials & safeguards
 

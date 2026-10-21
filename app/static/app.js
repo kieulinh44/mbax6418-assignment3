@@ -24,7 +24,9 @@ const themeToggle = $("theme-toggle");
 
 function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
-  themeToggle.textContent = theme === "dark" ? "☀️" : "🌙";
+  themeToggle.textContent = theme === "dark" ? "☼ Daylight" : "☾ After hours";
+  themeToggle.setAttribute("aria-label", theme === "dark" ? "Switch to light mode" : "Switch to dark mode");
+  themeToggle.title = themeToggle.getAttribute("aria-label");
 }
 
 function initTheme() {
@@ -86,16 +88,25 @@ function bind() {
   els.tracks.addEventListener("input", () => els.tracksVal.textContent = els.tracks.value);
   els.duration.addEventListener("input", () =>
     els.durationVal.textContent = els.duration.value + "s");
-  els.jamBtn.addEventListener("click", startJam);
+  els.jamBtn.addEventListener("click", () => startJam(false));
   els.singleBtn.addEventListener("click", () => startJam(true));
   els.playBtn.addEventListener("click", playSet);
   els.pauseBtn.addEventListener("click", togglePause);
   els.player.addEventListener("ended", onEnded);
-  els.player.addEventListener("play", () => els.pauseBtn.textContent = "⏸");
-  els.player.addEventListener("pause", () => els.pauseBtn.textContent = "▶");
+  els.player.addEventListener("play", () => {
+    els.pauseBtn.textContent = "Ⅱ Pause";
+    els.pauseBtn.setAttribute("aria-label", "Pause playback");
+    els.vinyl.classList.add("spin");
+    els.deckStatus.textContent = "Now playing · " + els.title.textContent;
+  });
+  els.player.addEventListener("pause", () => {
+    els.pauseBtn.textContent = "▶ Resume";
+    els.pauseBtn.setAttribute("aria-label", "Resume playback");
+    els.vinyl.classList.remove("spin");
+  });
   els.player.addEventListener("timeupdate", () => {
     if (els.player.duration) {
-      els.bar.style.width = (els.player.currentTime / els.player.duration * 100) + "%";
+      setProgress(els.player.currentTime / els.player.duration * 100);
     }
   });
 }
@@ -155,7 +166,7 @@ async function poll() {
   }
   const p = s.progress;
   const pct = p.total ? Math.round(p.done / p.total * 100) : 0;
-  els.bar.style.width = pct + "%";
+  setProgress(pct);
 
   if (s.state === "ready") {
     clearInterval(session.pollTimer); session.pollTimer = null;
@@ -209,6 +220,7 @@ function togglePause() {
 function onEnded() {
   if (!session.manifest) { // a lone library track finished — nothing queued
     els.pauseBtn.hidden = true;
+    els.vinyl.classList.remove("spin");
     els.deckStatus.textContent = "Playback finished.";
     return;
   }
@@ -221,7 +233,7 @@ function next() {
   const items = session.manifest.playlist;
   if (session.idx >= items.length) {
     els.deckStatus.textContent = "Set finished — thanks for listening!";
-    els.bar.style.width = "0%";
+    setProgress(0);
     els.pauseBtn.hidden = true;
     els.vinyl.classList.remove("spin");
     return;
@@ -297,9 +309,9 @@ function renderLibrary(tracks) {
       : '<span class="chip inst">instrumental</span>';
     li.innerHTML =
       `${thumb}<div class="tt"><div class="t">${escapeHtml(t.title)}</div>` +
-      `<div class="a">${escapeHtml(t.artist)}</div></div>` +
-      `<span class="chip">${t.bpm || "?"} BPM</span>${vocal}` +
-      `<button class="mini play-li" title="Play">▶</button>`;
+      `<div class="a">${escapeHtml(t.artist)}</div>` +
+      `<div class="track-meta"><span class="chip">${t.bpm || "?"} BPM</span>${vocal}</div></div>` +
+      `<button class="mini play-li" aria-label="Play ${escapeHtml(t.title)}" title="Play ${escapeHtml(t.title)}">▶</button>`;
     li.querySelector(".play-li").addEventListener("click", () => playLibraryTrack(t));
     els.libraryList.appendChild(li);
   }
@@ -328,21 +340,38 @@ async function health() {
   try { data = await api("/api/health"); }
   catch (_) { /* leave lights gray */ }
   els.lights.innerHTML = "";
+  if (!data.services.length) {
+    els.lights.textContent = "Services unavailable · retrying shortly";
+  }
+  const names = { "Qwen · text": "Composer", "FLUX · art": "Cover art", "ACE-Step · music": "Music", "Chatterbox · DJ": "DJ voice" };
   for (const s of data.services) {
-    const d = document.createElement("div");
-    d.className = "dot " + (s.ok ? "ok" : "bad");
-    d.title = `${s.name} — ${s.model}${s.ok ? "" : " (down)"}`;
+    const label = names[s.name] || s.name;
+    const d = document.createElement("span");
+    d.className = "service";
+    d.setAttribute("role", "img");
+    d.setAttribute("aria-label", `${label}: ${s.ok ? "connected" : "unavailable"}`);
+    d.title = `${s.name} — ${s.model}${s.ok ? " · connected" : " · unavailable"}`;
+    const dot = document.createElement("span");
+    dot.className = "dot " + (s.ok ? "ok" : "bad");
+    dot.setAttribute("aria-hidden", "true");
+    d.append(dot, document.createTextNode(label + (s.ok ? "" : " (offline)")));
     els.lights.appendChild(d);
   }
 }
 
 /* ---------------- misc ---------------- */
 
+function setProgress(percent) {
+  const value = Math.min(100, Math.max(0, Math.round(percent)));
+  els.bar.style.width = value + "%";
+  els.bar.parentElement.setAttribute("aria-valuenow", String(value));
+}
+
 function setControls(on) {
   els.jamBtn.disabled = !on;
   els.singleBtn.disabled = !on;
-  els.jamBtn.textContent = on ? "⚡ Start the jam" : "⚡ Jamming…";
-  els.singleBtn.textContent = on ? "🎵 Generate one song → library" : "🎵 Generating…";
+  els.jamBtn.textContent = on ? "♫ Start the jam" : "Pressing your records…";
+  els.singleBtn.textContent = on ? "＋ Generate one song" : "Creating your sound…";
 }
 
 function escapeHtml(s) {

@@ -4,8 +4,9 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>AI Jukebox</title>
-  <link rel="stylesheet" href="/static/style.css"/>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>"/>
+  <meta name="theme-color" content="#261710"/>
+  <link rel="stylesheet" href="/static/retro.css"/>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23261b13' stroke='%23d5b574' stroke-width='3'/%3E%3Ccircle cx='32' cy='32' r='14' fill='%23a34c31'/%3E%3Cpath d='M32 20 35 29 44 32 35 35 32 44 29 35 20 32 29 29Z' fill='%23f5d894'/%3E%3C/svg%3E"/>
   <script>
     /* Apply saved (or system) theme before first paint to avoid flashing */
     try {
@@ -16,102 +17,79 @@
   </script>
 </head>
 <body>
+  <a class="skip-link" href="#create">Skip to controls</a>
   <header class="topbar">
-    <div class="brand"><span class="eq">◉</span> AI&nbsp;JUKEBOX</div>
-    <div class="top-right">
-      <button id="theme-toggle" class="theme-toggle" aria-label="Toggle light/dark mode" title="Toggle light/dark mode"></button>
-      <div class="lights" id="status-lights" title="Class service health"></div>
+    <a class="wordmark" href="/" aria-label="AI Jukebox home"><span aria-hidden="true">◉</span> THE LISTENING ROOM</a>
+    <div class="top-right"><span class="edition">MBAX 6418 · AI MUSIC</span>
+      <button id="theme-toggle" class="theme-toggle" aria-label="Switch to light mode"></button>
     </div>
   </header>
 
-  <main class="layout">
-    <!-- Control panel -->
-    <section class="panel controls">
-      <h2>Create a set</h2>
+  <main class="cabinet">
+    <header class="marquee">
+      <div class="marquee-rule" aria-hidden="true"><span>✦</span></div>
+      <p class="eyebrow">CUSTOM RECORDS · ORIGINAL SOUND</p>
+      <h1>AI <em>Jukebox</em></h1>
+      <p class="marquee-sub">A little old-school soul. A whole new sound.</p>
+      <div class="marquee-rule bottom" aria-hidden="true"><span>✦</span></div>
+    </header>
 
-      <label class="field">Genre
-        <select id="genre"></select>
-      </label>
+    <div class="service-strip"><span class="service-caption">CONNECTED TO THE BAND</span>
+      <div class="lights" id="status-lights" role="group" aria-label="AI service availability"><span class="service-pending">Checking services…</span></div>
+    </div>
 
-      <label class="field">Mood
-        <select id="mood"></select>
-      </label>
-
-      <label class="field">Tempo
-        <div class="slider-row">
-          <input type="range" id="bpm" min="0" max="170" value="0" step="1"/>
-          <span class="val" id="bpm-val">auto</span>
+    <div class="layout">
+      <section class="panel controls" aria-labelledby="create" >
+        <div class="section-heading"><span class="section-no">01</span><div><p class="eyebrow">THE SELECTOR</p><h2 id="create" tabindex="-1">Create your record</h2></div></div>
+        <p class="section-intro">Dial in a sound. Make it your own.</p>
+        <div class="field-pair">
+          <div class="field"><label for="genre">Genre</label><select id="genre"></select></div>
+          <div class="field"><label for="mood">Mood</label><select id="mood"></select></div>
         </div>
-      </label>
-
-      <label class="field">Theme <input type="text" id="theme" placeholder="e.g. midnight road trip"/></label>
-
-      <label class="field check"><input type="checkbox" id="vocals" checked/> Vocals (singable lyrics)</label>
-
-      <label class="field">Songs in the set
-        <div class="slider-row">
-          <input type="range" id="tracks" min="1" max="8" value="3"/>
-          <span class="val" id="tracks-val">3</span>
-        </div>
-      </label>
-
-      <label class="field">Song length
-        <div class="slider-row">
-          <input type="range" id="duration" min="10" max="120" value="30" step="5"/>
-          <span class="val" id="duration-val">30s</span>
-        </div>
-      </label>
-
-      <label class="field">DJ persona
-        <select id="dj"></select>
-      </label>
-
-      <button id="jam-btn" class="primary">⚡ Start the jam</button>
-      <button id="single-btn" class="secondary">🎵 Generate one song → library</button>
-      <p class="hint">"Start the jam" builds a full DJ set; "one song" uses the same style / mood / duration / vocals and saves the track to your library.</p>
-      <p class="hint">All content is generated live by the MBAX&nbsp;6418 class AI services.</p>
-    </section>
-
-    <!-- Player deck -->
-    <section class="panel deck">
-      <div class="deck-status" id="deck-status">Pick a vibe and hit <b>Start the jam</b>.</div>
-
-      <div class="stage">
-        <div class="vinyl" id="vinyl"></div>
-        <div class="album">
-          <img id="art" src="" alt="album art"/>
-          <div class="art-fallback" id="art-fallback">◉</div>
-        </div>
-      </div>
-
-      <div class="now">
-        <div class="kind" id="kind">—</div>
-        <div class="title" id="title">AI Jukebox</div>
-        <div class="artist" id="artist">—</div>
-      </div>
-
-      <div class="progress"><div class="bar" id="bar"></div></div>
-
-      <div class="transport">
-        <button id="pause-btn" class="pause" hidden title="Pause / resume">⏸</button>
-        <button id="play-btn" class="primary play" hidden>▶ Play the set</button>
-      </div>
-
-      <audio id="player" preload="metadata"></audio>
-
-      <ul class="queue" id="queue"></ul>
-
-      <details class="lyrics" id="lyrics-box" hidden>
-        <summary>🎤 Lyrics</summary>
-        <pre id="lyrics-text"></pre>
-      </details>
-
-      <section class="library">
-        <h3>Library <span class="count" id="library-count"></span></h3>
-        <ul class="lib-list" id="library-list"></ul>
+        <div class="field"><div class="field-heading"><label for="bpm">Tempo</label><output class="val" id="bpm-val" for="bpm">auto</output></div><input type="range" id="bpm" min="0" max="170" value="0" step="1" aria-describedby="tempo-help"/><span class="field-help" id="tempo-help">Auto lets the composer choose the pace.</span></div>
+        <div class="field"><label for="theme">Theme or inspiration</label><input type="text" id="theme" placeholder="A midnight drive, a summer love…" maxlength="500"/></div>
+        <label class="field check" for="vocals"><input type="checkbox" id="vocals" checked/><span>Include vocals<small>Original lyrics, written for your song</small></span></label>
+        <div class="field"><div class="field-heading"><label for="duration">Song length</label><output class="val" id="duration-val" for="duration">30s</output></div><input type="range" id="duration" min="10" max="120" value="30" step="5"/></div>
+        <fieldset class="set-options"><legend>For a full DJ set</legend>
+          <div class="field"><div class="field-heading"><label for="tracks">Songs in the set</label><output class="val" id="tracks-val" for="tracks">3</output></div><input type="range" id="tracks" min="1" max="8" value="3"/></div>
+          <div class="field"><label for="dj">Your DJ</label><select id="dj"></select></div>
+        </fieldset>
+        <div class="create-actions"><button id="jam-btn" class="primary">♫ Start the jam</button><button id="single-btn" class="secondary">＋ Generate one song</button></div>
+        <p class="hint">A jam includes songs, covers &amp; spoken DJ breaks. One song skips the DJ. Both save to your collection.</p>
       </section>
-    </section>
+
+      <section class="panel deck" aria-label="Record player">
+        <div class="deck-label"><span class="on-air" aria-hidden="true"></span> THE TURNTABLE <span class="stereo">STEREO</span></div>
+        <div class="record-window">
+          <div class="stage">
+            <div class="vinyl" id="vinyl" aria-hidden="true"></div>
+            <div class="album"><img id="art" alt="Cover art for the current song"/><div class="art-fallback" id="art-fallback"><span class="record-star" aria-hidden="true">✦</span><span>YOUR NEXT<br/>FAVORITE RECORD</span><small>MADE RIGHT HERE</small></div></div>
+          </div>
+          <div class="now"><div class="kind" id="kind">READY WHEN YOU ARE</div><h2 class="title" id="title">Good things<br/>are about to spin.</h2><div class="artist" id="artist">Create a record or pick one from the collection.</div></div>
+        </div>
+        <div class="playback-console">
+          <div class="deck-status" id="deck-status" role="status" aria-live="polite">Pick your sound, then start the jam.</div>
+          <div class="progress" role="progressbar" aria-label="Generation or playback progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="bar" id="bar"></div></div>
+          <div class="transport"><button id="pause-btn" class="pause" hidden aria-label="Pause playback">Ⅱ Pause</button><button id="play-btn" class="primary play" hidden>▶ Play the set</button></div>
+          <audio id="player" preload="metadata"></audio>
+        </div>
+        <div class="queue-heading"><h3>On the playbill</h3><span>YOUR SESSION</span></div>
+        <ul class="queue" id="queue" aria-label="Session playlist"><li class="queue-empty">Your setlist will appear here.<br/><small>Every good night starts with a first song.</small></li></ul>
+        <details class="lyrics" id="lyrics-box" hidden><summary>Read the lyrics</summary><pre id="lyrics-text"></pre></details>
+        <div class="speaker-grille" aria-hidden="true"><span>✦</span></div>
+      </section>
+
+      <section class="panel library" aria-labelledby="collection-heading">
+        <div class="section-heading"><span class="section-no">02</span><div><p class="eyebrow">THE RECORD RACK</p><h2 id="collection-heading">Your collection <span class="count" id="library-count" aria-hidden="true"></span></h2></div></div>
+        <p class="section-intro">Freshly pressed. Yours to play again.</p>
+        <div class="rack-caption"><span>SONG / ARTIST</span><span>PLAY</span></div>
+        <ul class="lib-list" id="library-list" aria-label="Saved songs"></ul>
+        <p class="collection-note">Every generated song finds a home here.<br/>Saved locally, ready for another spin.</p>
+      </section>
+    </div>
+    <footer class="cabinet-footer"><span>ORIGINAL MUSIC. NO COINS REQUIRED.</span><span class="footer-star" aria-hidden="true">✦</span><span>POWERED BY THE MBAX 6418 CLASS AI SERVICES</span></footer>
   </main>
+  <footer class="page-footer">Made for the love of a good song.</footer>
 
   <script src="/static/app.js"></script>
 </body>
