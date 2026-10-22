@@ -120,6 +120,25 @@ Tablet and mobile layouts reflow without horizontal scrolling. Keyboard focus,
 a skip link, named playback buttons, live status announcements, accessible
 progress values, and reduced-motion support are included.
 
+### Short vocal songs
+
+Vocal songs now have a visible 60-second minimum in both the UI and API;
+instrumental clips still allow 10 seconds. Switching vocals on raises a shorter
+slider selection to 60 seconds before submission, with an explanation beside
+the control. Direct API requests for shorter vocal songs receive a validation
+error rather than silently changing their duration.
+
+At 60 seconds, songs are composed as compact, hook-first performances with a
+conservative budget of 1.2 sung words per second. Captions request singing from
+the first beat without an instrumental intro, solo or long outro. Before
+rendering, the app prioritizes chorus/hook lines and removes instrumental
+sections; saved lyrics match those submitted to ACE-Step. Longer songs retain
+their full arrangement. Real-audio checks found that prompt changes alone did
+not reliably produce recognizable lyrics in 10–30-second generations, whereas
+both tested 60-second generations contained singing. Music generation remains
+probabilistic; the minimum and arrangement controls are safeguards, not a
+guarantee of exact vocal timing or lyric fidelity. Existing audio is unchanged.
+
 ### Title and artist variety
 
 Naming forms rotate independently across genres: titles may be a single word,

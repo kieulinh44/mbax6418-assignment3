@@ -38,7 +38,8 @@ API_KEY = os.environ.get("AIJ_API_KEY", "")
 PORT = int(os.environ.get("AIJ_PORT", "8000"))
 
 # --- Generation defaults (safe, quick, demo-friendly) -------------------------
-DEFAULT_DURATION = 30   # seconds per song (ACE-Step allows 10-600)
+MIN_VOCAL_DURATION = 60  # shorter generations can end before the model starts singing
+DEFAULT_DURATION = 60   # safe default for the initially enabled vocals
 DEFAULT_TRACKS = 3
 MAX_TRACKS = 8
 MAX_DURATION = 120      # UI cap (ACE-Step allows up to 600)

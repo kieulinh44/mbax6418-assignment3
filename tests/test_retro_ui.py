@@ -52,6 +52,19 @@ class RetroInterfaceTests(unittest.TestCase):
         self.assertEqual(self.page.get_by_role("progressbar").get_attribute("aria-valuenow"), "100")
         self.assertTrue(self.page.locator("#jam-btn").is_enabled())
 
+    def test_vocals_have_visible_duration_floor_and_instrumentals_allow_short_clips(self):
+        expect(self.page.locator('#duration')).to_have_attribute('min', '60')
+        expect(self.page.locator('#duration')).to_have_value('60')
+        expect(self.page.locator('#duration-help')).to_contain_text('at least 60 seconds')
+        self.page.locator('#vocals').uncheck()
+        expect(self.page.locator('#duration')).to_have_attribute('min', '10')
+        self.page.locator('#duration').fill('10')
+        self.page.locator('#duration').dispatch_event('input')
+        expect(self.page.locator('#duration-val')).to_have_text('10s')
+        self.page.locator('#vocals').check()
+        expect(self.page.locator('#duration')).to_have_value('60')
+        expect(self.page.locator('#duration-val')).to_have_text('60s')
+
     def test_generation_error_recovers_controls(self):
         self.page.route("**/api/custom-song", lambda route: route.fulfill(json={"id": "error-ui-test"}))
         self.page.route("**/api/session/error-ui-test", lambda route: route.fulfill(json={"state": "error", "error": "Service temporarily unavailable", "progress": {"done": 0, "total": 1}}))

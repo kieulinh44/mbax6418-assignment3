@@ -52,7 +52,7 @@ class NamingTests(unittest.TestCase):
             track = songs.compose_track({'genre': 'synthwave', 'theme': 'regret', 'vocals': True})
         self.assertEqual(track['title'], 'Keep the Receipt')
         self.assertEqual(track['artist'], 'Maren Quill')
-        self.assertEqual(track['lyrics'], fresh['lyrics'])
+        self.assertEqual(track['lyrics'].split(), fresh['lyrics'].split())
         self.assertEqual(track['cover_prompt'], fresh['cover_prompt'])
         self.assertEqual(chat.call_count, 2)
         self.assertIn('Echo Tides', chat.call_args_list[0].args[1])

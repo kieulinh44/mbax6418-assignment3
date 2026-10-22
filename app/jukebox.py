@@ -188,13 +188,25 @@ def _build(sid: str, options: dict, total: int) -> None:
 
 def _generate_song(spec: dict, options: dict):
     from .clients import generate_song as gen
+    duration = float(options.get('duration_sec', config.DEFAULT_DURATION))
+    if options.get('vocals', True):
+        if duration < config.MIN_VOCAL_DURATION:
+            raise ValueError(f'Vocal songs need at least {config.MIN_VOCAL_DURATION} seconds. '
+                             'Disable vocals for shorter clips.')
+        caption, lyrics = songs_mod.short_vocal_arrangement(spec['caption'], spec['lyrics'], duration)
+        if not lyrics.strip():
+            raise ValueError('Vocal song has no singable lyrics. Please generate again.')
+        # Persist exactly the lyrics/arrangement submitted to the music service.
+        spec['caption'], spec['lyrics'] = caption, lyrics
+    else:
+        spec['lyrics'] = ''
     return gen(
         spec["caption"],
         spec["lyrics"],
         bpm=spec.get("bpm") or None,
         key_scale=spec.get("key_scale") or "",
         time_signature=spec.get("time_signature") or "",
-        duration=float(options.get("duration_sec", config.DEFAULT_DURATION)),
+        duration=duration,
         thinking=True,
         audio_format="mp3",
     )
