@@ -152,23 +152,33 @@ input[type="checkbox"] { width: 21px; height: 21px; accent-color: var(--accent);
 .playback-console { padding: 17px 0 10px; }
 .deck-status { font-size: 13px; line-height: 1.5; min-height: 38px; text-align: center; color: var(--muted); overflow-wrap: anywhere; }
 .deck-status .spin { color: var(--aqua); }.deck-status .err { color: var(--err); }.deck-status .warn { color: var(--warn); }
-.progress { height: 5px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; margin-top: 9px; cursor: pointer; }
-.gen-progress { cursor: default; pointer-events: none; margin-top: 4px; }
+.progress { position: relative; height: 44px; border-radius: 4px; margin-top: 0; cursor: pointer; }
+.gen-progress { height: 5px; margin-top: 8px; cursor: default; pointer-events: none; background: var(--panel-2); border: 1px solid var(--line); overflow: hidden; }
+.gen-progress .bar { position: static; height: 100%; width: 0; background: var(--aqua); transition: width .2s; }
 .gen-progress:focus-visible { outline: none; }
+.progress::before { content: ''; position: absolute; left: 0; right: 0; top: 20px; height: 5px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; }
+.progress[aria-disabled="true"] { cursor: default; }
+.seek-dot { position: absolute; top: 22px; left: clamp(7px, var(--position, 0%), calc(100% - 7px)); width: 14px; height: 14px; border-radius: 50%; transform: translate(-50%, -50%); background: var(--brass); border: 2px solid #f5dfb0; box-shadow: 0 1px 4px #160b0899; pointer-events: none; }
 .progress:focus-visible { outline: 2px solid var(--aqua); outline-offset: 4px; }
-.bar { height: 100%; width: 0; background: var(--aqua); transition: width .2s; }
-.transport { display: flex; gap: 10px; margin-top: 12px; }
+.bar { position: absolute; top: 20px; height: 5px; width: 0; border-radius: 4px; background: var(--aqua); }
+.transport { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 0; }
+.skip { flex: 0 0 44px; width: 44px; min-height: 46px; padding: 0; border: 1px solid var(--brass); border-radius: 50%; background: var(--panel-2); color: var(--text); font-size: 14px; }
+.skip:hover:not(:disabled) { background: var(--panel); }
+.skip:disabled { opacity: .4; cursor: not-allowed; }
+.skip:focus-visible { outline: 2px solid var(--aqua); outline-offset: 3px; }
 .transport:has(> :not([hidden])) { margin-bottom: 7px; }
-.transport .play { flex: 1; }
+.transport .play { flex: 1 0 100%; }
 .pause { flex: 1; }
 .queue-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line); }
 .queue-heading h3 { margin: 0; font-size: 14px; font-weight: 500; }.queue-heading > span { font-size: 9px; letter-spacing: .1em; color: var(--muted); }
 .queue { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; max-height: 250px; overflow-y: auto; }
-.queue li { display: flex; gap: 8px; align-items: center; padding: 9px 8px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); background: var(--panel-2); font-size: 13px; }
+.queue li { display: flex; gap: 8px; align-items: center; padding: 9px 8px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); background: var(--panel-2); font-size: 13px; cursor: pointer; transition: border-color .12s, color .12s; }
 .queue .queue-empty { display: block; text-align: center; padding: 15px 5px; border: 1px dashed var(--line); line-height: 1.8; }
 .queue-empty small { font-size: 12px; }
 .queue li .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); flex: none; }
 .queue li.current { border-color: var(--aqua); color: var(--text); }
+.queue li:hover { border-color: var(--aqua); color: var(--text); }
+.queue li:focus-visible { outline: 2px solid var(--aqua); outline-offset: 1px; }
 .queue li.current .dot { background: var(--aqua); }.queue li.done .dot { background: var(--ok); }
 .queue .tag { font-size: 9px; letter-spacing: .06em; text-transform: uppercase; flex: none; }.queue .song { color: var(--coral); }.queue .dj { color: var(--aqua); }
 .queue .tt { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }

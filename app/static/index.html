@@ -71,13 +71,13 @@
         <div class="playback-console">
           <div class="deck-status" id="deck-status" role="status" aria-live="polite">Pick your sound, then start the jam.</div>
           <div class="progress gen-progress" id="gen-progress" role="progressbar" aria-label="Song generation progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="bar" id="gen-bar"></div></div>
-          <div class="progress" id="progress-track" role="slider" tabindex="0" aria-label="Seek playback position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="bar" id="bar"></div></div>
-          <div class="transport"><button id="skip-btn" class="secondary" disabled aria-label="Skip to next clip">⏭ Skip</button><button id="pause-btn" class="pause" hidden aria-label="Pause playback">Ⅱ Pause</button><button id="play-btn" class="primary play" hidden>▶ Play the set</button></div>
+          <div class="progress" id="progress-track" role="slider" tabindex="0" aria-label="Seek playback position" aria-disabled="true" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="bar" id="bar"></div><span id="seek-dot" class="seek-dot" hidden aria-hidden="true"></span></div>
+          <div class="transport"><button id="previous-btn" class="skip" disabled aria-label="Previous segment" title="Previous song or DJ segment"><span aria-hidden="true">❮❮</span></button><button id="pause-btn" class="pause" hidden aria-label="Pause playback">Ⅱ Pause</button><button id="next-btn" class="skip" disabled aria-label="Next segment" title="Next song or DJ segment"><span aria-hidden="true">❯❯</span></button><button id="play-btn" class="primary play" hidden>▶ Play the set</button></div>
           <audio id="player" preload="metadata"></audio>
         </div>
         <div class="queue-heading"><h3>On the playbill</h3><span>YOUR SESSION</span></div>
         <ul class="queue" id="queue" aria-label="Session playlist"><li class="queue-empty">Your setlist will appear here.<br/><small>Every good night starts with a first song.</small></li></ul>
-        <details class="lyrics" id="lyrics-box" hidden><summary>Read the lyrics</summary><pre id="lyrics-text"></pre></details>
+        <details class="lyrics" id="lyrics-box" hidden><summary>Read the lyrics</summary><p class="field-help">Lyric sheet · AI-sung repeats or wording may vary.</p><pre id="lyrics-text"></pre></details>
         <div class="speaker-grille" aria-hidden="true"><span>✦</span></div>
       </section>
 

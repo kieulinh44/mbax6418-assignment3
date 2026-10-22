@@ -16,7 +16,7 @@ from . import art, naming, config
 SYSTEM_PROMPT = """You are the songwriting brain of an AI jukebox. You turn a listener's customization into a complete music-production order for a text-to-music model (ACE-Step) and write the lyrics.
 
 Songwriting craft (apply it):
-- Structure must fit the requested duration and ARRANGEMENT brief below, which overrides full-song conventions. A short clip is a complete compact vocal hook, NOT the opening of a longer song. Longer songs may use verse/chorus/bridge sections with a strong title HOOK.
+- Structure must fit the requested duration and ARRANGEMENT brief below, which overrides full-song conventions. A short clip is a complete compact vocal hook, NOT the opening of a longer song. Longer songs may use verse/chorus/bridge sections with a strong title HOOK. Write every sung section in its exact performance order, including repeated choruses in their proper places; do not group all choruses together or use shorthand such as 'repeat chorus'.
 - Show, don't tell: concrete images over emotion-labels. Keep the meter singable; line-to-line syllable counts should match so it can be sung.
 - Mix perfect and slant rhymes. Avoid cliches on autopilot.
 - Emotional arc: verses lower and sparser, chorus bigger and hooky, bridge a shift, final chorus the peak.
@@ -178,7 +178,7 @@ def short_vocal_arrangement(caption: str, lyrics: str, duration: float) -> tuple
     if duration > 60:
         return caption, lyrics
     instruction = ('Start singing immediately on the first beat, with clear lead vocals '
-                   'singing the hook throughout this short clip. No instrumental intro, '
+                   'singing the supplied sections in their exact written order. No instrumental intro, '
                    'solo, breakdown or long outro. Complete the sung phrase before the end. ')
     sections: list[tuple[str, list[str]]] = []
     tag, lines = '[Chorus]', []
@@ -194,28 +194,33 @@ def short_vocal_arrangement(caption: str, lyrics: str, duration: float) -> tuple
             lines.append(line)
     if lines:
         sections.append((tag, lines))
-    sections.sort(key=lambda section: 0 if re.fullmatch(
+    start = next((i for i, section in enumerate(sections) if re.fullmatch(
         r'\[\s*(?:(?:final|last)\s+)?(?:chorus|hook)(?:\s+\d+)?\s*\]',
-        section[0], re.I) else 1)
+        section[0], re.I)), 0)
+    # Take a contiguous hook-first excerpt. Sorting all chorus sections to the
+    # front shuffled verses and repeats, and flattening erased their boundaries.
     remaining = max(1, int(duration * 1.2))
     chosen = []
-    for _, section_lines in sections:
+    for tag, section_lines in sections[start:]:
+        selected_lines = []
         for line in section_lines:
             words = line.split()
             if len(words) <= remaining:
-                chosen.append(line)
+                selected_lines.append(line)
                 remaining -= len(words)
-            elif not chosen:
-                chosen.append(' '.join(words[:remaining]))
+            elif not chosen and not selected_lines:
+                selected_lines.append(' '.join(words[:remaining]))
                 remaining = 0
             else:
                 remaining = 0
             if not remaining:
                 break
+        if selected_lines:
+            chosen.append(tag + '\n' + '\n'.join(selected_lines))
         if not remaining:
             break
     return (caption if caption.startswith(instruction) else instruction + caption,
-            '[Chorus]\n' + '\n'.join(chosen) if chosen else '')
+            '\n\n'.join(chosen))
 
 
 def _default_bpm(genre: str, mood: str) -> int:

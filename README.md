@@ -31,7 +31,7 @@ A "jam" session is one customizable set:
    BPM/key/time signature, cover-art prompt) *and* the DJ's spoken script.
 3. **ACE-Step** generates each song's audio; **FLUX** paints the matching cover art.
 4. **Chatterbox** speaks the DJ persona's intro, interludes, and outro.
-5. The browser plays the whole set back-to-back: intro → track introduction → song → track introduction → song → … → outro.
+5. The browser plays the whole set back-to-back: intro → DJ chat → song → DJ chat → song → … → outro.
 
 Sessions are generated in a background thread; the page polls progress and plays when ready.
 Artifacts live in `sessions/<id>/` (gitignored) alongside a `manifest.json` playlist.
@@ -138,6 +138,12 @@ Tablet and mobile layouts reflow without horizontal scrolling. Keyboard focus,
 a skip link, named playback buttons, live status announcements, accessible
 progress values, and reduced-motion support are included.
 
+Previous / Pause–Resume / Next controls step through individual playlist entries,
+including DJ segments as well as songs, without wrapping at the set boundaries.
+The seek bar has a visible circular playhead during loaded audio playback and
+supports clicking and keyboard arrows/Home/End. Generation progress does not
+show an audio playhead.
+
 ### Short vocal songs
 
 Vocal songs have a visible 60-second minimum in both the UI and API;
@@ -149,12 +155,21 @@ error rather than silently changing their duration.
 At 60 seconds, songs are composed as compact, hook-first performances with a
 conservative budget of 1.2 sung words per second. Captions request singing from
 the first beat without an instrumental intro, solo or long outro. Before
-rendering, the app prioritizes chorus/hook lines and removes instrumental
-sections; saved lyrics match those submitted to ACE-Step. Longer songs retain
-their full arrangement. Earlier repository notes reported unreliable vocals in 10–30-second generations.
-Current test evidence and its limits are recorded in [the verification report](docs/verification.md). Music generation remains
+rendering, the app takes a contiguous excerpt beginning at the first chorus/hook
+and removes instrumental sections, preserving the subsequent verse/chorus order
+and section labels rather than sorting all choruses ahead of verses. Longer songs retain
+their full arrangement. Real-audio checks found that prompt changes alone did
+not reliably produce recognizable lyrics in 10–30-second generations, whereas
+both tested 60-second generations contained singing. Music generation remains
 probabilistic; the minimum and arrangement controls are safeguards, not a
 guarantee of exact vocal timing or lyric fidelity. Existing audio is unchanged.
+
+The lyric display uses the music service's returned lyric sheet when available,
+falling back to the submitted sheet. The original submitted text is retained as
+`written_lyrics`, alongside `lyrics_source`, in new session/library entries.
+These are lyric sheets, not audio transcriptions or timestamped karaoke lyrics:
+the generator can still repeat, omit or alter words. Existing recordings and
+their older saved lyric sheets are not rewritten automatically.
 
 ### Title and artist variety
 

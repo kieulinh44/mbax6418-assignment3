@@ -92,6 +92,13 @@ def _build(sid: str, options: dict, total: int, reference_audio: bytes | None = 
             steps += 1
             _update(sid, progress={"stage": f"generating song {i + 1}/{total}", "done": steps})
             audio, meta = _generate_song(spec, options)
+            service_lyrics = meta.get('lyrics')
+            service_lyrics = service_lyrics.strip() if isinstance(service_lyrics, str) else ''
+            written_lyrics = spec['lyrics']
+            has_service_lyrics = bool(service_lyrics)
+            # Service metadata may contain a revised lyric sheet. Never discard
+            # it in favor of the draft, but do not call it an audio transcription.
+            lyrics = service_lyrics if has_service_lyrics and written_lyrics else written_lyrics
             (sdir / f"song_{i + 1}.mp3").write_bytes(audio)
             steps += 1
             _update(sid, progress={"stage": f"painting cover {i + 1}/{total}", "done": steps})
@@ -117,7 +124,9 @@ def _build(sid: str, options: dict, total: int, reference_audio: bytes | None = 
                     "seed": meta.get("seed_value", ""),
                     "gen_time_s": meta.get("gen_time_s"),
                 },
-                "lyrics": spec["lyrics"],
+                "lyrics": lyrics,
+                "written_lyrics": written_lyrics,
+                "lyrics_source": 'music_service' if has_service_lyrics and written_lyrics else 'submitted',
             })
 
         # 3) add every song to the persistent library (rubric requirement) ----
@@ -154,9 +163,10 @@ def _build(sid: str, options: dict, total: int, reference_audio: bytes | None = 
                 "meta": {},
             }]
             for i, t in enumerate(tracks):
+                # DJ introduces the upcoming track, then the song plays
                 playlist.append({
                     "kind": "chat",
-                    "title": "DJ interlude",
+                    "title": "DJ intro",
                     "artist": persona,
                     "audio": f"/sessions/{sid}/dj_chat_{i + 1}.mp3",
                     "meta": {},

@@ -49,7 +49,7 @@ class RetroInterfaceTests(unittest.TestCase):
         self.assertEqual(captured[0]["theme"], "A test theme")
         self.assertFalse(captured[0]["vocals"])
         self.assertEqual(self.page.locator("#queue li").count(), 1)
-        self.assertEqual(self.page.get_by_role("progressbar").get_attribute("aria-valuenow"), "100")
+        self.assertEqual(self.page.get_by_role("slider", name="Seek playback position").get_attribute("aria-valuenow"), "100")
         self.assertTrue(self.page.locator("#jam-btn").is_enabled())
 
     def test_vocals_have_visible_duration_floor_and_instrumentals_allow_short_clips(self):
@@ -122,7 +122,7 @@ class RetroInterfaceTests(unittest.TestCase):
     def test_generation_progress_is_accessible(self):
         self.page.route("**/api/session/ui-progress", lambda route: route.fulfill(json={"state": "building", "progress": {"done": 2, "total": 4, "stage": "Painting cover art"}}))
         self.page.evaluate("session.id = 'ui-progress'; poll()")
-        self.assertEqual(self.page.get_by_role("progressbar").get_attribute("aria-valuenow"), "50")
+        self.assertEqual(self.page.get_by_role("slider", name="Seek playback position").get_attribute("aria-valuenow"), "50")
         self.assertIn("Painting cover art", self.page.locator("#deck-status").inner_text())
 
     def test_service_health_has_text_not_just_color(self):
@@ -252,12 +252,15 @@ class RetroInterfaceTests(unittest.TestCase):
         self.assertIsNone(player.get_attribute('src'))
         expect(self.page.locator('#pause-btn')).not_to_be_visible()
         expect(self.page.locator('#play-btn')).not_to_be_visible()
+        expect(self.page.locator('#seek-dot')).not_to_be_visible()
+        expect(self.page.locator('#previous-btn')).to_be_disabled()
+        expect(self.page.locator('#next-btn')).to_be_disabled()
         expect(self.page.locator('#title')).to_have_text('Good things are about to spin.')
         expect(self.page.locator('#kind')).to_have_text('READY WHEN YOU ARE')
         expect(self.page.locator('#lyrics-box')).not_to_be_visible()
         self.assertIsNone(self.page.locator('#art').get_attribute('src'))
         self.assertNotIn('spin', self.page.locator('#vinyl').get_attribute('class') or '')
-        self.assertEqual(self.page.get_by_role('progressbar').get_attribute('aria-valuenow'), '0')
+        self.assertEqual(self.page.get_by_role('slider', name='Seek playback position').get_attribute('aria-valuenow'), '0')
 
     def test_remove_unrelated_library_or_original_session_does_not_stop_playback(self):
         for source in ('/library/tracks/1234abcd/audio.mp3', '/sessions/original/audio.mp3'):
@@ -307,6 +310,167 @@ class RetroInterfaceTests(unittest.TestCase):
                     self.assertFalse(self.page.evaluate('document.documentElement.scrollWidth > innerWidth'))
                     self.assertFalse(dialog.evaluate('el => el.scrollWidth > el.clientWidth'))
                     dialog.get_by_role('button', name='Cancel', exact=True).click()
+
+    def segment_fixture(self):
+        audio = io.BytesIO()
+        with wave.open(audio, 'wb') as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(8000)
+            wav.writeframes(b'\0\0' * 8000 * 20)
+        def serve_audio(route):
+            body = audio.getvalue()
+            requested = route.request.headers.get('range')
+            if requested:
+                start, end = requested.removeprefix('bytes=').split('-')
+                start, end = int(start), int(end) if end else len(body) - 1
+                route.fulfill(status=206, body=body[start:end + 1], content_type='audio/wav',
+                              headers={'Accept-Ranges': 'bytes', 'Content-Range': f'bytes {start}-{end}/{len(body)}'})
+            else:
+                route.fulfill(body=body, content_type='audio/wav', headers={'Accept-Ranges': 'bytes'})
+        self.page.route('**/segment-*.wav', serve_audio)
+        self.page.evaluate("""() => {
+            session.manifest = {playlist: [
+                {kind: 'intro', title: 'DJ welcome', audio: '/segment-0.wav'},
+                {kind: 'song', title: 'First song', artist: 'Artist', lyrics: 'Song lyrics', art: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>', audio: '/segment-1.wav'},
+                {kind: 'interlude', title: 'DJ break', audio: '/segment-2.wav'}
+            ]};
+            renderQueue(session.manifest.playlist); playSet();
+        }""")
+        self.page.wait_for_function('!player.paused && player.currentTime > 0')
+
+    def test_previous_next_step_songs_and_dj_without_wrapping(self):
+        self.segment_fixture()
+        previous = self.page.get_by_role('button', name='Previous segment', exact=True)
+        following = self.page.get_by_role('button', name='Next segment', exact=True)
+        expect(previous).to_be_disabled()
+        following.click()
+        expect(self.page.locator('#title')).to_have_text('First song')
+        expect(self.page.locator('#lyrics-text')).to_have_text('Song lyrics')
+        expect(self.page.locator('#art')).to_have_class('show')
+        self.page.get_by_role('button', name='Pause playback', exact=True).click()
+        following.click()  # Selection plays, consistently with a playbill row.
+        self.page.wait_for_function('!player.paused && player.currentTime > 0')
+        expect(self.page.locator('#title')).to_have_text('DJ break')
+        expect(self.page.locator('#lyrics-box')).not_to_be_visible()
+        self.assertIsNone(self.page.locator('#art').get_attribute('src'))
+        expect(following).to_be_disabled()
+        previous.click()
+        expect(self.page.locator('#title')).to_have_text('First song')
+        self.assertLess(self.page.locator('#player').evaluate('el => el.currentTime'), 2)
+        previous.click()
+        expect(self.page.locator('#title')).to_have_text('DJ welcome')
+        expect(previous).to_be_disabled()
+        for theme in ('light', 'dark'):
+            self.page.evaluate('theme => applyTheme(theme)', theme)
+            self.page.set_viewport_size({'width': 320, 'height': 1000})
+            for button in (previous, following):
+                box = button.bounding_box()
+                assert box is not None
+                self.assertGreaterEqual(box['width'], 44)
+                self.assertGreaterEqual(box['height'], 44)
+            self.assertFalse(self.page.evaluate('document.documentElement.scrollWidth > innerWidth'))
+        self.page.evaluate('jumpTo(2)')
+        self.page.wait_for_function('!player.paused && player.readyState === 4 && player.seekable.length && player.seekable.end(0) === player.duration && player.currentSrc.endsWith("segment-2.wav")')
+        self.page.locator('#player').evaluate('el => el.currentTime = el.duration - 0.1')
+        expect(self.page.locator('#deck-status')).to_contain_text('Set finished')
+        expect(following).to_be_disabled()
+        previous.click()
+        expect(self.page.locator('#title')).to_have_text('First song')
+        self.page.evaluate("playLibraryTrack({title: 'Lone record', audio_url: '/segment-1.wav'})")
+        expect(previous).to_be_disabled()
+        expect(following).to_be_disabled()
+        self.page.evaluate('jumpTo(0)')
+        expect(self.page.locator('#title')).to_have_text('Lone record')
+
+    def test_seek_dot_tracks_real_audio_click_and_keyboard_not_generation(self):
+        dot = self.page.locator('#seek-dot')
+        expect(dot).not_to_be_visible()
+        self.page.evaluate('setProgress(75)')
+        expect(dot).not_to_be_visible()
+        self.segment_fixture()
+        expect(dot).to_be_visible()
+        self.page.wait_for_function('player.currentTime > 0.5')
+        start = dot.bounding_box()['x']
+        self.page.wait_for_function('player.currentTime > 1.5')
+        self.assertGreater(dot.bounding_box()['x'], start)
+        slider = self.page.get_by_role('slider', name='Seek playback position')
+        box = slider.bounding_box()
+        slider.click(position={'x': box['width'] * .5, 'y': box['height'] / 2})
+        self.page.wait_for_function('player.currentTime >= 9 && player.currentTime < 12')
+        self.assertAlmostEqual(dot.bounding_box()['x'] + dot.bounding_box()['width'] / 2,
+                               box['x'] + box['width'] / 2, delta=5)
+        slider.focus()
+        slider.press('ArrowLeft')
+        self.assertLess(self.page.locator('#player').evaluate('el => el.currentTime'), 10)
+        slider.press('Home')
+        self.assertLess(self.page.locator('#player').evaluate('el => el.currentTime'), 1)
+        self.assertGreaterEqual(dot.bounding_box()['x'], box['x'])
+        self.page.evaluate('jumpTo(2)')
+        self.page.wait_for_function('player.currentSrc.endsWith("segment-2.wav") && player.readyState === 4')
+        slider.press('End')
+        expect(self.page.locator('#deck-status')).to_contain_text('Set finished')
+        self.assertLessEqual(dot.bounding_box()['x'] + dot.bounding_box()['width'], box['x'] + box['width'])
+        self.page.evaluate('jumpTo(1)')
+        self.page.wait_for_function('player.currentSrc.endsWith("segment-1.wav") && player.readyState === 4')
+        self.assertLess(float(slider.get_attribute('aria-valuenow')), 5)
+        self.page.route('**/api/custom-song', lambda route: route.fulfill(json={'id': 'dot-generation'}))
+        self.page.route('**/api/session/dot-generation', lambda route: route.fulfill(json={'state': 'building', 'progress': {'done': 1, 'total': 2}}))
+        self.page.locator('#single-btn').click()
+        expect(dot).not_to_be_visible()
+        expect(self.page.locator('#previous-btn')).to_be_disabled()
+        expect(self.page.locator('#next-btn')).to_be_disabled()
+        self.assertTrue(self.page.locator('#player').evaluate('el => el.paused'))
+        expect(slider).to_have_attribute('aria-valuenow', '50')
+
+    def test_collection_autoplay_fallback_has_only_one_resume_control(self):
+        self.segment_fixture()
+        self.page.evaluate("""() => {
+            window.realPlay = player.play.bind(player);
+            player.pause();
+            player.play = () => Promise.reject(new DOMException('Blocked', 'NotAllowedError'));
+            playLibraryTrack({title: 'Collection record', audio_url: '/segment-1.wav'});
+        }""")
+        expect(self.page.locator('#play-btn')).not_to_be_visible()
+        resume = self.page.get_by_role('button', name='Resume playback', exact=True)
+        expect(resume).to_be_visible()
+        self.assertEqual(self.page.locator('button:visible').filter(has_text='Resume').count(), 1)
+        expect(self.page.locator('#previous-btn')).to_be_disabled()
+        expect(self.page.locator('#next-btn')).to_be_disabled()
+        self.page.evaluate('() => { player.play = window.realPlay; }')
+        resume.click()
+        self.page.wait_for_function('!player.paused && player.currentTime > 0')
+        expect(self.page.locator('#title')).to_have_text('Collection record')
+        expect(self.page.get_by_role('button', name='Pause playback', exact=True)).to_be_visible()
+        expect(self.page.locator('#play-btn')).not_to_be_visible()
+
+    def test_autoplay_fallback_resumes_selection_and_ignores_stale_rejections(self):
+        self.segment_fixture()
+        self.page.evaluate("""() => {
+            window.realPlay = player.play.bind(player);
+            player.pause();
+            player.play = () => Promise.reject(new DOMException('Blocked', 'NotAllowedError'));
+        }""")
+        self.page.locator('#next-btn').click()
+        expect(self.page.locator('#play-btn')).not_to_be_visible()
+        expect(self.page.locator('#pause-btn')).to_have_text('▶ Resume')
+        expect(self.page.locator('#title')).to_have_text('First song')
+        self.page.evaluate('() => { player.play = window.realPlay; }')
+        self.page.get_by_role('button', name='Resume playback', exact=True).click()
+        self.page.wait_for_function('!player.paused && player.currentTime > 0')
+        self.assertEqual(self.page.evaluate('session.idx'), 1)
+        self.page.evaluate("""() => {
+            player.pause();
+            player.play = () => new Promise((resolve, reject) => { window.rejectOldPlay = reject; });
+            jumpTo(2);
+            const rejectOld = window.rejectOldPlay;
+            player.play = window.realPlay;
+            playLibraryTrack({title: 'New selection', audio_url: '/segment-1.wav'});
+            rejectOld(new DOMException('Superseded', 'AbortError'));
+        }""")
+        expect(self.page.locator('#play-btn')).not_to_be_visible()
+        self.page.locator('#lyrics-box').evaluate('el => el.open = true')
+        expect(self.page.locator('#lyrics-box')).to_contain_text('Lyric sheet · AI-sung repeats or wording may vary.')
 
     def test_creation_and_playback_have_named_landmarks(self):
         self.assertEqual(self.page.get_by_role("heading", name="Create your record", exact=True).count(), 1)

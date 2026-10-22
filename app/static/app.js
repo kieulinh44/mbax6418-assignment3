@@ -15,6 +15,8 @@ const els = {
   singleBtn: $("single-btn"), libraryList: $("library-list"),
   lyricsBox: $("lyrics-box"), lyricsText: $("lyrics-text"),
   libraryCount: $("library-count"), pauseBtn: $("pause-btn"),
+  previousBtn: $("previous-btn"), nextBtn: $("next-btn"),
+  seekDot: $("seek-dot"),
 };
 
 const session = { id: null, pollTimer: null, manifest: null, idx: -1, resumePending: false };
@@ -22,6 +24,8 @@ let pendingRemoval = null;
 let libraryTracks = [];
 let removing = false;
 let minVocalDuration = 60;
+let resumeMode = false;
+let playbackAttempt = 0;
 const removeDialog = $("remove-dialog");
 
 /* ---------------- theme ---------------- */
@@ -103,9 +107,10 @@ function bind() {
     els.durationVal.textContent = els.duration.value + "s");
   els.jamBtn.addEventListener("click", () => startJam(false));
   els.singleBtn.addEventListener("click", () => startJam(true));
-  els.playBtn.addEventListener("click", playSet);
+  els.playBtn.addEventListener("click", onPlayBtnClick);
   els.pauseBtn.addEventListener("click", togglePause);
-  $("skip-btn").addEventListener("click", next);
+  els.previousBtn.addEventListener("click", () => jumpTo(session.idx - 1));
+  els.nextBtn.addEventListener("click", () => jumpTo(session.idx + 1));
   els.progressTrack.addEventListener("click", seekFromPointer);
   els.progressTrack.addEventListener("keydown", seekFromKeyboard);
   els.player.addEventListener("ended", onEnded);
@@ -125,11 +130,9 @@ function bind() {
     els.pauseBtn.setAttribute("aria-label", "Resume playback");
     els.vinyl.classList.remove("spin");
   });
-  els.player.addEventListener("timeupdate", () => {
-    if (els.player.duration) {
-      setProgress(els.player.currentTime / els.player.duration * 100);
-    }
-  });
+  for (const event of ["timeupdate", "seeking", "seeked", "loadedmetadata", "durationchange", "emptied"]) {
+    els.player.addEventListener(event, updatePlaybackProgress);
+  }
 }
 
 /* ---------------- jam lifecycle ---------------- */
@@ -158,11 +161,23 @@ async function startJam(single) {
     dj_persona: els.dj.value,
   };
   els.player.pause();
-  $("skip-btn").disabled = true;
+  els.nextBtn.disabled = true;
   session.manifest = null;
   session.resumePending = false;
   setControls(false);
+  clearInterval(session.pollTimer);
+  session.pollTimer = null;
+  session.id = null;
+  session.manifest = null;
+  session.idx = -1;
+  els.player.pause();
+  els.player.removeAttribute("src");
+  els.player.load();
+  resetPlaybackProgress();
+  updateTransport();
+  resumeMode = false;
   els.playBtn.hidden = true;
+  els.playBtn.textContent = "▶ Play the set";
   els.pauseBtn.hidden = true;
   els.queue.innerHTML = "";
   renderQueuePlaceholder(options.tracks);
@@ -243,31 +258,61 @@ function renderQueue(playlist) {
     li.innerHTML = `<span class="dot"></span><span class="tag ${tag}">${tag}</span><span class="tt"></span>`;
     li.querySelector(".tt").textContent = tt;
     li.dataset.idx = i;
+    li.title = "Jump to this track (skips what's before it)";
+    li.tabIndex = 0;
+    li.setAttribute("role", "button");
+    li.addEventListener("click", () => jumpTo(i));
+    li.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); jumpTo(i); }
+    });
     els.queue.appendChild(li);
   });
 }
 
-function playSet() {
-  if (session.resumePending) {
-    session.resumePending = false;
+function onPlayBtnClick() {
+  if (resumeMode) {
+    // Resume at the current position instead of restarting the set
+    resumeMode = false;
     els.playBtn.hidden = true;
-    togglePause();
+    els.playBtn.textContent = "▶ Play the set";
+    playAudio("Still blocked — click Resume again.");
     return;
   }
+  playSet();
+}
+
+function showResume(msg) {
+  resumeMode = true;
+  els.deckStatus.textContent = msg || "Paused — press Resume to keep playing.";
+  // Use the central transport control, not a second resume action below it.
+  els.playBtn.hidden = true;
+  els.pauseBtn.hidden = false;
+  els.pauseBtn.textContent = "▶ Resume";
+  els.pauseBtn.setAttribute("aria-label", "Resume playback");
+}
+
+function playAudio(message) {
+  const attempt = ++playbackAttempt;
+  els.player.play().catch(error => {
+    // Loading a different segment cancels an earlier play() promise.
+    if (attempt === playbackAttempt && error.name !== "AbortError") showResume(message);
+  });
+}
+
+function playSet() {
+  resumeMode = false;
   session.idx = -1;
   els.playBtn.hidden = true;
+  els.playBtn.textContent = "▶ Play the set";
   els.pauseBtn.hidden = false;
   next();
 }
 
 function togglePause() {
   if (els.player.paused) {
-    els.player.play().catch(() => {
-      session.resumePending = true;
-      els.playBtn.hidden = false;
-      els.playBtn.textContent = "▶ Resume";
-      els.deckStatus.textContent = "Playback could not start. Press Resume to retry, or skip this clip.";
-    });
+    resumeMode = false;
+    els.playBtn.hidden = true;
+    playAudio();
   } else {
     els.player.pause();
   }
@@ -293,19 +338,16 @@ function seekFromKeyboard(event) {
 }
 
 function seekTo(time) {
-  if (time === null || !Number.isFinite(time)) return;
-  els.player.currentTime = time;
-  setProgress(els.player.duration ? time / els.player.duration * 100 : 0);
+  const duration = els.player.duration;
+  if (time === null || !Number.isFinite(time) || !Number.isFinite(duration) || duration <= 0 || els.player.readyState === 0) return;
+  els.player.currentTime = Math.min(duration, Math.max(0, time));
+  updatePlaybackProgress();
   els.pauseBtn.hidden = false;
-  els.player.play().catch(() => {
-    els.deckStatus.textContent = "Position selected — press Resume to play.";
-    els.playBtn.hidden = false;
-    session.resumePending = true;
-    els.playBtn.textContent = "▶ Resume";
-  });
+  playAudio("Position selected — press Resume to play.");
 }
 
 function onEnded() {
+  resumeMode = false;
   if (!session.manifest) { // a lone library track finished — nothing queued
     els.pauseBtn.hidden = true;
     els.vinyl.classList.remove("spin");
@@ -317,23 +359,20 @@ function onEnded() {
 
 function next() {
   if (!session.manifest) return; // a lone library track ended; nothing queued
-  els.player.pause();
-  session.resumePending = false;
-  session.idx++;
   const items = session.manifest.playlist;
-  if (session.idx >= items.length) {
-    $("skip-btn").disabled = true;
+  if (session.idx + 1 >= items.length) {
     els.deckStatus.textContent = "Set finished — thanks for listening!";
-    els.playBtn.hidden = false;
-    els.playBtn.textContent = "▶ Replay the set";
     setProgress(0);
     els.pauseBtn.hidden = true;
     els.vinyl.classList.remove("spin");
+    updateTransport();
     return;
   }
-  $("skip-btn").disabled = false;
+  session.idx++;
   const item = items[session.idx];
+  resetPlaybackProgress();
   els.player.src = item.audio;
+  updateTransport();
 
   setNowPlaying(item);
   [...els.queue.children].forEach(li => {
@@ -342,15 +381,26 @@ function next() {
     li.classList.toggle("playing", i === session.idx);
     li.classList.toggle("done", i < session.idx);
   });
-  els.player.play().catch(() => {
-    els.deckStatus.textContent = "⚠ Browser blocked autoplay — hit ▶ Resume to keep going.";
-    els.playBtn.hidden = false;
-    session.resumePending = true;
-    els.playBtn.textContent = "▶ Resume";
-  });
+  playAudio("⚠ Browser blocked autoplay — hit Resume to keep going.");
 }
 
-function playSetAt(idx) { session.idx = idx - 1; next(); }
+function jumpTo(idx) {
+  // Click a playbill row to skip ahead (or back) to that track
+  if (!session.manifest || !Number.isInteger(idx) || idx < 0 || idx >= session.manifest.playlist.length) return;
+  resumeMode = false;
+  session.idx = idx - 1; // next() advances to idx
+  els.playBtn.hidden = true;
+  els.playBtn.textContent = "▶ Play the set";
+  els.pauseBtn.hidden = false;
+  next();
+}
+
+function updateTransport() {
+  const items = session.manifest?.playlist || [];
+  const active = session.idx >= 0 && session.idx < items.length;
+  els.previousBtn.disabled = !active || session.idx === 0;
+  els.nextBtn.disabled = !active || session.idx >= items.length - 1;
+}
 
 function setNowPlaying(item) {
   const isSong = item.kind === "song";
@@ -437,6 +487,8 @@ async function confirmRemoval() {
       els.player.load();
       session.manifest = null;
       session.idx = -1;
+      resumeMode = false;
+      updateTransport();
       els.playBtn.hidden = true;
       els.playBtn.onclick = null;
       els.pauseBtn.hidden = true;
@@ -451,7 +503,7 @@ async function confirmRemoval() {
       els.lyricsBox.hidden = true;
       els.lyricsText.textContent = "";
       els.deckStatus.textContent = "Song removed. Pick another record to play.";
-      setProgress(0);
+      resetPlaybackProgress();
       [...els.queue.children].forEach(li => li.classList.remove("current", "playing", "done"));
     }
     renderLibrary(libraryTracks.filter(t => t.id !== track.id));
@@ -469,21 +521,20 @@ async function confirmRemoval() {
 }
 
 function playLibraryTrack(t) {
-  $("skip-btn").disabled = true;
+  els.nextBtn.disabled = true;
   session.resumePending = false;
   session.manifest = null; // exit set mode; play this single library track
+  session.idx = -1;
+  resumeMode = false;
+  updateTransport();
   [...els.queue.children].forEach(li => li.classList.remove("current", "playing", "done"));
+  resetPlaybackProgress();
   els.player.src = t.audio_url;
   els.vinyl.classList.add("spin");
   els.playBtn.hidden = true;
   els.pauseBtn.hidden = false;
   setNowPlaying({ kind: "song", title: t.title, artist: t.artist, art: t.art_url, lyrics: t.lyrics });
-  els.player.play().catch(() => {
-    els.deckStatus.textContent = "⚠ Click ▶ Resume to start playback.";
-    els.playBtn.hidden = false;
-    session.resumePending = true;
-    els.playBtn.textContent = "▶ Resume";
-  });
+  playAudio("⚠ Click Resume to start playback.");
 }
 
 /* ---------------- health lights ---------------- */
@@ -513,6 +564,25 @@ async function health() {
 }
 
 /* ---------------- misc ---------------- */
+
+function resetPlaybackProgress() {
+  playbackAttempt++;
+  els.seekDot.hidden = true;
+  els.progressTrack.setAttribute("aria-disabled", "true");
+  els.progressTrack.style.setProperty("--position", "0%");
+  setProgress(0);
+}
+
+function updatePlaybackProgress() {
+  const duration = els.player.duration;
+  const loaded = !!els.player.getAttribute("src") && els.player.readyState > 0 && Number.isFinite(duration) && duration > 0;
+  els.seekDot.hidden = !loaded;
+  els.progressTrack.setAttribute("aria-disabled", String(!loaded));
+  if (!loaded) return; // Generation percentage is not an audio position.
+  const value = Math.min(100, Math.max(0, els.player.currentTime / duration * 100));
+  els.progressTrack.style.setProperty("--position", value + "%");
+  setProgress(value);
+}
 
 function setProgress(percent) {
   const value = Math.min(100, Math.max(0, Math.round(percent)));
