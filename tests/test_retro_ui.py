@@ -150,6 +150,24 @@ class RetroInterfaceTests(unittest.TestCase):
         self.assertGreaterEqual(box["height"], 44)
         self.assertTrue(self.page.locator(".track-meta").is_visible())
 
+    def test_collection_groups_and_filters_records_by_selected_genre(self):
+        self.page.evaluate("""renderLibrary([
+            {id: 'aaaaaaaa', title: 'Neon One', artist: 'Artist A', set_genre: 'synthwave'},
+            {id: 'bbbbbbbb', title: 'Blue Note', artist: 'Artist B', set_genre: 'jazz'},
+            {id: 'cccccccc', title: 'Neon Two', artist: 'Artist C', set_genre: 'synthwave'},
+            {id: 'dddddddd', title: 'Mystery', artist: 'Artist D'}
+        ])""")
+        self.assertEqual(self.page.locator(".genre-heading").all_inner_texts(), [
+            "Jazz\n1 RECORD", "Other\n1 RECORD", "Synthwave\n2 RECORDS"
+        ])
+        expect(self.page.locator("#library-genre")).to_have_value("all")
+        expect(self.page.locator("#library-genre")).to_contain_text("synthwave (2)")
+        self.page.locator("#library-genre").select_option("synthwave")
+        expect(self.page.locator("#library-list")).to_contain_text("Neon One")
+        expect(self.page.locator("#library-list")).to_contain_text("Neon Two")
+        expect(self.page.locator("#library-list")).not_to_contain_text("Blue Note")
+        self.assertEqual(self.page.locator(".genre-heading").all_inner_texts(), ["Synthwave\n2 RECORDS"])
+
     def test_jam_button_uses_full_set_endpoint(self):
         requests = []
         self.page.route("**/api/jam", lambda route: (requests.append(route.request), route.fulfill(status=200, json={"id": "ui-test"})))
@@ -300,7 +318,7 @@ class RetroInterfaceTests(unittest.TestCase):
                     self.page.evaluate('theme => applyTheme(theme)', theme)
                     remove = self.page.get_by_role('button', name='Remove Fixture record', exact=True)
                     box = remove.bounding_box()
-                    row = self.page.locator('#library-list li').bounding_box()
+                    row = self.page.locator('#library-list .library-track').bounding_box()
                     assert box and row
                     self.assertGreaterEqual(box['height'], 44)
                     self.assertLessEqual(box['x'] + box['width'], row['x'] + row['width'])
