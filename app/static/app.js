@@ -10,6 +10,7 @@ const els = {
   jamBtn: $("jam-btn"), playBtn: $("play-btn"), deckStatus: $("deck-status"),
   art: $("art"), artFallback: $("art-fallback"), vinyl: $("vinyl"),
   kind: $("kind"), title: $("title"), artist: $("artist"), bar: $("bar"), progressTrack: $("progress-track"),
+  genProgress: $("gen-progress"), genBar: $("gen-bar"),
   player: $("player"), queue: $("queue"), lights: $("status-lights"),
   singleBtn: $("single-btn"), libraryList: $("library-list"),
   lyricsBox: $("lyrics-box"), lyricsText: $("lyrics-text"),
@@ -517,6 +518,10 @@ function setProgress(percent) {
   const value = Math.min(100, Math.max(0, Math.round(percent)));
   els.bar.style.width = value + "%";
   els.bar.parentElement.setAttribute("aria-valuenow", String(value));
+  if (els.genProgress) {
+    els.genBar.style.width = value + "%";
+    els.genProgress.setAttribute("aria-valuenow", String(value));
+  }
 }
 
 function setControls(on) {

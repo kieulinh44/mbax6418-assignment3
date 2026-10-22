@@ -22,9 +22,13 @@ optional voice references use the documented Chatterbox `ref_audio` request fiel
 
 ## Automated checks
 
-50 Python unit/API regressions and five Node playback regressions passed.
-JavaScript syntax and Git whitespace checks passed. These mock-based tests are
-separate from the live service checks below.
+**69 Python tests passed** (unit/API regressions, the 19 Playwright browser
+tests, and the file-based configuration regression tests) and **five Node
+playback regressions passed**, executed on the review machine on October 22,
+2026. The Playwright browser suite that an earlier pass recorded as unexecuted
+(macOS Chromium launch denial) now runs headless and passes. JavaScript syntax
+and Git whitespace checks passed. These mock-based tests are separate from the
+live service checks below.
 
 ## File-based configuration regression
 
@@ -53,6 +57,8 @@ Windows/macOS copy commands, restart requirement and environment precedence.
 | Malformed DJ output | Live three-song build returned wrong introduction count; expect rejection and recovery | Initial sample build stopped explicitly after saving songs; a subsequent valid script generated five DJ clips without regenerating music. Bounded script retries added and tested; the separate two-song live jam then completed normally |
 | Playback | Browser plays a generated library MP3, shows artwork and original lyrics, and pauses/resumes | Checked through the in-app browser; audio loaded with HTTP 206, playback progress advanced, lyric panel showed the generated text, Pause changed to Resume |
 | Queue regression | Retry autoplay without resetting the selected clip; skip pauses first and stops at queue end | Node regression tests pass |
+| Generation-progress accessibility (regression found in review) | Three Playwright tests expected a `role=progressbar` element with `aria-valuenow` 0 → 50 → 100 while building; the retro redesign had removed it, so all three timed out (30s each) | Added `#gen-progress` (role=progressbar) to the player and wired `setProgress()` to update it; the three tests passed and the full suite went from 63/66 to 66/66 |
+| Fresh live vocal generation (this review) | Pop, happy, 60 seconds, vocals on, one song, theme "morning coffee run"; expect original lyrics, playable 60s MP3, matching FLUX cover, library entry | Session `16546f8b6c98` reached `ready`; 60.0 s MP3 (48 kHz) + PNG cover generated via class services and added to the library |
 
 Automated transcription excerpts (imperfect transcription, not a claim of exact singing):
 
@@ -94,12 +100,12 @@ a ten-second vocal request returned HTTP 422. This agent-run check does not repl
 the required teammate check.
 
 See README for setup and manual exercises. The following final checks must be
-completed by the team: listen to all three samples, check perceived custom-voice
-similarity, test automatic DJ/music playback and skip over a complete set, and have
-a teammate run the GitHub-downloaded ZIP from scratch. Full Playwright UI tests
-could not launch Chromium here because macOS denied its Mach-port bootstrap
-permission; this is recorded as unexecuted, not passed. In-app browser spot checks
-and Node regressions do not replace that entire browser suite.
+completed by the team (each is a task for a person, not an automated claim):
+listen to the samples and a fresh vocal song, check perceived custom-voice
+similarity, test automatic DJ/music playback and skip over a complete set, and
+have a teammate run the GitHub-downloaded ZIP from scratch. The Playwright
+browser suite is now executed and green on the review machine; a teammate
+running it on a second machine would strengthen the record.
 
 ## Publication and teamwork
 

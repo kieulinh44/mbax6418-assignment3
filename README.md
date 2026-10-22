@@ -268,13 +268,61 @@ instrumental recordings cannot gain vocals retroactively; generate a new vocal s
 See the [ACE-Step API documentation](https://github.com/ace-step/ACE-Step-1.5/blob/main/docs/en/API.md)
 for these options. Keep Include vocals checked and select at least 60 seconds.
 
+## Design judgment
+
+**Choice: preserve Qwen's vocal arrangement instead of letting ACE-Step rewrite it.**
+ACE-Step accepts CoT caption/language options that re-derive the musical brief
+from the prompt. We disable them (`use_cot_caption=false`, `use_cot_language=false`)
+and send the composer's singing instructions, arrangement and lyrics plus an
+explicit `vocal_language` unchanged. Evidence: the three bundled 60-second vocal
+samples, generated through this path, all produced recognizable lyric phrases
+under an independent transcription check ("Pocket Light", "Did You Look Up?",
+"I held my breath for one more step" — see `docs/verification.md` for excerpts).
+Caveat: transcription showed word substitutions and repeated lines, so this is a
+mitigation, not a proof of lyric-perfect audio for every generation.
+
+**Limitation investigated: short vocal clips come back instrumental.**
+The original reported bug was "no singing." Testing showed 10–30-second
+generations do not reliably contain recognizable vocals regardless of prompt,
+while both 60-second tests did (see "Short vocal songs"). Lesson: the safest
+guarantee is structural, not prompt-level — the app now enforces a 60-second
+minimum for vocal tracks in both the UI and the API, and composes short vocal
+clips as hook-first arrangements. A second failure investigated (DJ scripts with
+the wrong number of spoken intros) is caught by validating the script structure
+and retrying up to three times, so an invalid queue is never marked ready.
+
 ## Samples and interface evidence
 
-Three 60-second pop songs were composed by Qwen, rendered by ACE-Step, and paired
-with FLUX artwork on October 22, 2026. See `samples/manifest.json` for the titles,
-lyrics, cover prompts, generation services, theme, durations, and seeds. Samples
-contain generated media only. To replace them, generate a completed three-song jam
-and run `python scripts/export_samples.py SESSION_ID`, then listen to all three.
+### How the sample songs, lyrics, and covers were generated
+
+The three bundled samples are original class-service output, not third-party
+media. One click of **Start the jam** in the app produced all of them; the flow
+was:
+
+1. **Options** — pop, happy, 60 seconds, vocals on, theme "small moments of
+   courage on the way home".
+2. **Composition (Qwen, port 9001)** — the songwriter prompt turned those options
+   into each song's production spec: a title and fictional artist, original
+   lyrics with [Chorus]/[Verse] structure, a music caption (style, mood, BPM,
+   key), and a cover-art prompt grounded in the song's story.
+3. **Audio (ACE-Step, port 9007)** — each spec, including the full lyrics, was
+   submitted to the text-to-music service (`vocal_language=en`, caption
+   rewriting disabled) and rendered as a 60-second MP3.
+4. **Covers (FLUX, port 9006)** — each song's cover prompt was sent to the
+   image service and saved as a PNG; every cover is unique to its song's theme
+   (palette, medium, composition and art direction are recorded per track).
+5. **Verification** — an independent transcription check recovered recognizable
+   lyric phrases from all three songs (excerpts in `docs/verification.md`), and
+   the covers were visually checked. Exact lyric fidelity remains probabilistic
+   — the team's listening review is the final check.
+
+Every detail of the above — per-service provenance, options, per-track lyrics,
+cover prompts, BPM/key, and seeds — is recorded in `samples/manifest.json`
+(`source_session` stores the generating session id). To replace the samples,
+generate a completed three-song jam and run
+`python scripts/export_samples.py SESSION_ID`, then listen to all three.
+
+Samples contain generated media only.
 
 ![Interface and connected class services](docs/screenshots/interface.png)
 ![Generated sample songs and covers in the collection](docs/screenshots/collection.png)
