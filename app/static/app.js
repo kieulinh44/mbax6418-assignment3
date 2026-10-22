@@ -9,7 +9,7 @@ const els = {
   duration: $("duration"), durationVal: $("duration-val"), dj: $("dj"),
   jamBtn: $("jam-btn"), playBtn: $("play-btn"), deckStatus: $("deck-status"),
   art: $("art"), artFallback: $("art-fallback"), vinyl: $("vinyl"),
-  kind: $("kind"), title: $("title"), artist: $("artist"), bar: $("bar"),
+  kind: $("kind"), title: $("title"), artist: $("artist"), bar: $("bar"), progressTrack: $("progress-track"),
   player: $("player"), queue: $("queue"), lights: $("status-lights"),
   singleBtn: $("single-btn"), libraryList: $("library-list"),
   lyricsBox: $("lyrics-box"), lyricsText: $("lyrics-text"),
@@ -17,6 +17,10 @@ const els = {
 };
 
 const session = { id: null, pollTimer: null, manifest: null, idx: -1 };
+let pendingRemoval = null;
+let libraryTracks = [];
+let removing = false;
+const removeDialog = $("remove-dialog");
 
 /* ---------------- theme ---------------- */
 
@@ -24,7 +28,9 @@ const themeToggle = $("theme-toggle");
 
 function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
-  themeToggle.textContent = theme === "dark" ? "☀️" : "🌙";
+  themeToggle.textContent = theme === "dark" ? "☼ Daylight" : "☾ After hours";
+  themeToggle.setAttribute("aria-label", theme === "dark" ? "Switch to light mode" : "Switch to dark mode");
+  themeToggle.title = themeToggle.getAttribute("aria-label");
 }
 
 function initTheme() {
@@ -81,21 +87,36 @@ function fillSelect(sel, entries, def) {
 }
 
 function bind() {
+  $("remove-cancel").addEventListener("click", () => removeDialog.close());
+  removeDialog.addEventListener("close", () => { pendingRemoval = null; });
+  removeDialog.addEventListener("cancel", (event) => { if (removing) event.preventDefault(); });
+  $("remove-confirm").addEventListener("click", confirmRemoval);
   els.bpm.addEventListener("input", () =>
     els.bpmVal.textContent = els.bpm.value === "0" ? "auto" : els.bpm.value + " BPM");
   els.tracks.addEventListener("input", () => els.tracksVal.textContent = els.tracks.value);
   els.duration.addEventListener("input", () =>
     els.durationVal.textContent = els.duration.value + "s");
-  els.jamBtn.addEventListener("click", startJam);
+  els.jamBtn.addEventListener("click", () => startJam(false));
   els.singleBtn.addEventListener("click", () => startJam(true));
   els.playBtn.addEventListener("click", playSet);
   els.pauseBtn.addEventListener("click", togglePause);
+  els.progressTrack.addEventListener("click", seekFromPointer);
+  els.progressTrack.addEventListener("keydown", seekFromKeyboard);
   els.player.addEventListener("ended", onEnded);
-  els.player.addEventListener("play", () => els.pauseBtn.textContent = "⏸");
-  els.player.addEventListener("pause", () => els.pauseBtn.textContent = "▶");
+  els.player.addEventListener("play", () => {
+    els.pauseBtn.textContent = "Ⅱ Pause";
+    els.pauseBtn.setAttribute("aria-label", "Pause playback");
+    els.vinyl.classList.add("spin");
+    els.deckStatus.textContent = "Now playing · " + els.title.textContent;
+  });
+  els.player.addEventListener("pause", () => {
+    els.pauseBtn.textContent = "▶ Resume";
+    els.pauseBtn.setAttribute("aria-label", "Resume playback");
+    els.vinyl.classList.remove("spin");
+  });
   els.player.addEventListener("timeupdate", () => {
     if (els.player.duration) {
-      els.bar.style.width = (els.player.currentTime / els.player.duration * 100) + "%";
+      setProgress(els.player.currentTime / els.player.duration * 100);
     }
   });
 }
@@ -155,7 +176,7 @@ async function poll() {
   }
   const p = s.progress;
   const pct = p.total ? Math.round(p.done / p.total * 100) : 0;
-  els.bar.style.width = pct + "%";
+  setProgress(pct);
 
   if (s.state === "ready") {
     clearInterval(session.pollTimer); session.pollTimer = null;
@@ -206,9 +227,41 @@ function togglePause() {
   }
 }
 
+function seekFromPointer(event) {
+  const rect = els.progressTrack.getBoundingClientRect();
+  seekTo(AIJPlayback.seekTime(event.clientX, rect.left, rect.width, els.player.duration));
+}
+
+function seekFromKeyboard(event) {
+  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+  event.preventDefault();
+  const duration = els.player.duration;
+  if (!duration) return;
+  const step = Math.max(duration / 100, 1);
+  let time = els.player.currentTime;
+  if (event.key === "ArrowLeft") time -= step;
+  if (event.key === "ArrowRight") time += step;
+  if (event.key === "Home") time = 0;
+  if (event.key === "End") time = duration;
+  seekTo(time);
+}
+
+function seekTo(time) {
+  if (time === null || !Number.isFinite(time)) return;
+  els.player.currentTime = time;
+  setProgress(els.player.duration ? time / els.player.duration * 100 : 0);
+  els.pauseBtn.hidden = false;
+  els.player.play().catch(() => {
+    els.deckStatus.textContent = "Position selected — press Resume to play.";
+    els.playBtn.hidden = false;
+    els.playBtn.textContent = "▶ Resume";
+  });
+}
+
 function onEnded() {
   if (!session.manifest) { // a lone library track finished — nothing queued
     els.pauseBtn.hidden = true;
+    els.vinyl.classList.remove("spin");
     els.deckStatus.textContent = "Playback finished.";
     return;
   }
@@ -221,7 +274,7 @@ function next() {
   const items = session.manifest.playlist;
   if (session.idx >= items.length) {
     els.deckStatus.textContent = "Set finished — thanks for listening!";
-    els.bar.style.width = "0%";
+    setProgress(0);
     els.pauseBtn.hidden = true;
     els.vinyl.classList.remove("spin");
     return;
@@ -278,6 +331,7 @@ async function refreshLibrary() {
 }
 
 function renderLibrary(tracks) {
+  libraryTracks = tracks;
   els.libraryCount.textContent = tracks.length ? `(${tracks.length})` : "";
   els.libraryList.innerHTML = "";
   if (!tracks.length) {
@@ -297,11 +351,67 @@ function renderLibrary(tracks) {
       : '<span class="chip inst">instrumental</span>';
     li.innerHTML =
       `${thumb}<div class="tt"><div class="t">${escapeHtml(t.title)}</div>` +
-      `<div class="a">${escapeHtml(t.artist)}</div></div>` +
-      `<span class="chip">${t.bpm || "?"} BPM</span>${vocal}` +
-      `<button class="mini play-li" title="Play">▶</button>`;
+      `<div class="a">${escapeHtml(t.artist)}</div>` +
+      `<div class="track-meta"><span class="chip">${t.bpm || "?"} BPM</span>${vocal}</div></div>` +
+      `<div class="track-actions"><button class="mini play-li" aria-label="Play ${escapeHtml(t.title)}" title="Play ${escapeHtml(t.title)}">▶</button>` +
+      `<button class="remove-li" aria-label="Remove ${escapeHtml(t.title)}">Remove</button></div>`;
     li.querySelector(".play-li").addEventListener("click", () => playLibraryTrack(t));
+    li.querySelector(".remove-li").addEventListener("click", () => {
+      pendingRemoval = t;
+      $("remove-title").textContent = t.title;
+      $("remove-status").textContent = "";
+      removeDialog.showModal();
+      $("remove-cancel").focus();
+    });
     els.libraryList.appendChild(li);
+  }
+}
+
+async function confirmRemoval() {
+  if (!pendingRemoval || removing) return;
+  const track = pendingRemoval;
+  removing = true;
+  $("remove-confirm").disabled = true;
+  $("remove-cancel").disabled = true;
+  $("remove-status").textContent = "Removing saved song…";
+  try {
+    await api("/api/library/" + encodeURIComponent(track.id), { method: "DELETE" });
+    // Compare the actual loaded copy, not title/session identity. Session audio
+    // and a different library song must continue without interruption.
+    if (els.player.getAttribute("src") && new URL(els.player.src).pathname === `/library/tracks/${track.id}/audio.mp3`) {
+      els.player.pause();
+      els.player.removeAttribute("src");
+      els.player.load();
+      session.manifest = null;
+      session.idx = -1;
+      els.playBtn.hidden = true;
+      els.playBtn.onclick = null;
+      els.pauseBtn.hidden = true;
+      els.pauseBtn.textContent = "Ⅱ Pause";
+      els.pauseBtn.setAttribute("aria-label", "Pause playback");
+      els.vinyl.classList.remove("spin");
+      els.art.classList.remove("show");
+      els.art.removeAttribute("src");
+      els.kind.textContent = "READY WHEN YOU ARE";
+      els.title.textContent = "Good things are about to spin.";
+      els.artist.textContent = "Create a record or pick one from the collection.";
+      els.lyricsBox.hidden = true;
+      els.lyricsText.textContent = "";
+      els.deckStatus.textContent = "Song removed. Pick another record to play.";
+      setProgress(0);
+      [...els.queue.children].forEach(li => li.classList.remove("current", "playing", "done"));
+    }
+    renderLibrary(libraryTracks.filter(t => t.id !== track.id));
+    await refreshLibrary();
+    removeDialog.close();
+    $("library-status").textContent = `Removed “${track.title}” from your collection. ${libraryTracks.length} saved ${libraryTracks.length === 1 ? "song remains" : "songs remain"}.`;
+    $("collection-heading").focus();
+  } catch (error) {
+    $("remove-status").textContent = "Could not remove song: " + error.message + ". The song is still listed. Check saved files, then try again or cancel.";
+  } finally {
+    removing = false;
+    $("remove-confirm").disabled = false;
+    $("remove-cancel").disabled = false;
   }
 }
 
@@ -328,21 +438,38 @@ async function health() {
   try { data = await api("/api/health"); }
   catch (_) { /* leave lights gray */ }
   els.lights.innerHTML = "";
+  if (!data.services.length) {
+    els.lights.textContent = "Services unavailable · retrying shortly";
+  }
+  const names = { "Qwen · text": "Composer", "FLUX · art": "Cover art", "ACE-Step · music": "Music", "Chatterbox · DJ": "DJ voice" };
   for (const s of data.services) {
-    const d = document.createElement("div");
-    d.className = "dot " + (s.ok ? "ok" : "bad");
-    d.title = `${s.name} — ${s.model}${s.ok ? "" : " (down)"}`;
+    const label = names[s.name] || s.name;
+    const d = document.createElement("span");
+    d.className = "service";
+    d.setAttribute("role", "img");
+    d.setAttribute("aria-label", `${label}: ${s.ok ? "connected" : "unavailable"}`);
+    d.title = `${s.name} — ${s.model}${s.ok ? " · connected" : " · unavailable"}`;
+    const dot = document.createElement("span");
+    dot.className = "dot " + (s.ok ? "ok" : "bad");
+    dot.setAttribute("aria-hidden", "true");
+    d.append(dot, document.createTextNode(label + (s.ok ? "" : " (offline)")));
     els.lights.appendChild(d);
   }
 }
 
 /* ---------------- misc ---------------- */
 
+function setProgress(percent) {
+  const value = Math.min(100, Math.max(0, Math.round(percent)));
+  els.bar.style.width = value + "%";
+  els.bar.parentElement.setAttribute("aria-valuenow", String(value));
+}
+
 function setControls(on) {
   els.jamBtn.disabled = !on;
   els.singleBtn.disabled = !on;
-  els.jamBtn.textContent = on ? "⚡ Start the jam" : "⚡ Jamming…";
-  els.singleBtn.textContent = on ? "🎵 Generate one song → library" : "🎵 Generating…";
+  els.jamBtn.textContent = on ? "♫ Start the jam" : "Pressing your records…";
+  els.singleBtn.textContent = on ? "＋ Generate one song" : "Creating your sound…";
 }
 
 function escapeHtml(s) {

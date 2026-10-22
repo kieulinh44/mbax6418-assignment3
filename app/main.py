@@ -66,6 +66,20 @@ def library_list() -> dict:
     return {"tracks": library.list_tracks()}
 
 
+@app.delete("/api/library/{track_id}")
+def library_remove(track_id: str) -> dict:
+    try:
+        library.remove(track_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid song ID")
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Song not found")
+    except OSError:
+        library.log.exception("Could not remove library song %s", track_id)
+        raise HTTPException(status_code=500, detail="Could not remove song. Check local files and try again.")
+    return {"removed": track_id}
+
+
 @app.get("/api/session/{sid}")
 def session_status(sid: str) -> dict:
     s = jukebox.get(sid)

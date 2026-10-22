@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import shutil
 import threading
 import time
@@ -61,6 +62,8 @@ def add(track: dict, audio_path: Path, art_path: Path | None, *,
         "duration_sec": meta.get("duration"),
         "vocals": bool(lyrics),
         "lyrics": lyrics,
+        "art_direction": track.get("art_direction", {}),
+        "cover_prompt": track.get("cover_prompt", ""),
         "seed": meta.get("seed", ""),
         "audio_url": f"/library/tracks/{track_id}/audio.mp3",
         "art_url": f"/library/tracks/{track_id}/cover.png" if has_art else "",
@@ -80,13 +83,46 @@ def list_tracks() -> list[dict]:
         return _read_index_locked()
 
 
+def remove(track_id: str) -> None:
+    """Remove a library copy, never its original session assets."""
+    if not isinstance(track_id, str) or not re.fullmatch(r"[0-9a-f]{8}", track_id):
+        raise ValueError("Invalid song ID")
+    with _lock:
+        index = _read_index_locked()
+        if not any(t['id'] == track_id for t in index):
+            raise KeyError(track_id)
+        tdir = TRACKS_DIR / track_id
+        if LIBRARY_DIR.is_symlink() or TRACKS_DIR.is_symlink() or tdir.is_symlink():
+            raise OSError("Refusing to remove a symlinked library path")
+        # Stage the exact copy so an index-write failure cannot destroy audio.
+        staged = LIBRARY_DIR / f".removing-{track_id}-{uuid.uuid4().hex}"
+        tdir.rename(staged)
+        committed = False
+        try:
+            _write_index_locked([t for t in index if t['id'] != track_id])
+            committed = True
+            shutil.rmtree(staged)
+        except OSError:
+            # Cleanup can fail partway through: restore what remains and surface
+            # the failure rather than claiming the song was removed.
+            if staged.exists():
+                staged.rename(tdir)
+            if committed:
+                _write_index_locked(index)
+            raise
+
+
 def _read_index_locked() -> list[dict]:
     try:
         data = json.loads(INDEX_PATH.read_text(encoding="utf-8"))
-        return data if isinstance(data, list) else []
-    except Exception:  # noqa: BLE001 - a corrupt index is not fatal
-        log.warning("library index unreadable; starting fresh")
-        return []
+    except (ValueError, UnicodeError) as exc:
+        raise OSError("Library index is unreadable; refusing to overwrite it") from exc
+    if not isinstance(data, list) or any(
+        not isinstance(t, dict) or not isinstance(t.get("id"), str)
+        or not re.fullmatch(r"[0-9a-f]{8}", t["id"]) for t in data
+    ):
+        raise OSError("Library index is invalid; refusing to overwrite it")
+    return data
 
 
 def _write_index_locked(index: list[dict]) -> None:

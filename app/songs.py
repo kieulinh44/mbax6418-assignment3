@@ -7,7 +7,10 @@ by Qwen (9001) and normalized here.
 """
 from __future__ import annotations
 
+import json
+
 from .clients import chat_json
+from . import art, naming
 
 SYSTEM_PROMPT = """You are the songwriting brain of an AI jukebox. You turn a listener's customization into a complete music-production order for a text-to-music model (ACE-Step) and write the lyrics.
 
@@ -22,9 +25,10 @@ ACE-Step caption craft: describe genre + mood + era + instruments + vocal style 
 Rules:
 - Respond with ONE valid JSON object only. No markdown fences, no extra text.
 - If vocals are disabled, set "lyrics" to "" and "instrumental" to true.
-- Title: 2-5 words, memorable, reflecting the theme.
-- Artist: an invented band/artist name (2-4 words); never a real artist.
-- cover_prompt: a vivid text-to-image prompt for the album cover (subject, style, palette, mood; 1-3 sentences; instruct that there is NO text, letters, or typography in the image).
+- Title: follow the assigned title form; 1-8 words and at most 60 characters. Draw from a specific story detail or hook, rather than automatically repeating the theme verbatim or using an adjective plus genre-coded noun.
+- Artist: follow the assigned artist form; invent a fictional identity, never name a real artist. It may be a solo name, mononym, duo or band, not always an adjective-noun band name. At most 60 characters. Do not recycle the song title as the artist identity.
+- Naming: use the ASSIGNED NAMING BRIEF. Recent names are across ALL genres, including songs composed but not yet saved. Avoid those names, near-spellings, numbered variants and overused vocabulary. Artist identities must also avoid the listed artist_words_to_avoid: do not reuse a surname or signature band word with a different prefix. A subject explicitly requested by the listener may still appear in a title if essential, but artist names should be independent. Genre aesthetics and art materials are NOT a naming word bank. Keep the final title and its sung hook consistent.
+- cover_prompt: a vivid finished album-art scene in 3-5 sentences, with NO text, letters or typography. Follow the ASSIGNED VISUAL BRIEF for palette, medium, and the matched composition/richness. Describe the focal subject, its specific environment, interacting secondary details, textures and lighting. For layered treatments, develop foreground, middle distance and atmosphere with discoveries at different scales. For the graphic treatment, use a powerful designed background and a few meaningful details rather than a generic icon on blank paper. Invent imagery from this song's story, lyrics or theme. The musical genre must NOT dictate the palette or visual style. Do not default to neon skylines, sunset grids, guitars or other genre shorthand unless the listener specifically requests that subject.
 
 JSON fields:
 {
@@ -44,12 +48,30 @@ JSON fields:
 
 def compose_track(opts: dict, index: int = 0, total: int = 1) -> dict:
     """Compose one song spec from the session options."""
-    user = _user_prompt(opts, index, total)
-    spec = chat_json(SYSTEM_PROMPT, user, max_tokens=6000, temperature=0.8, retries=2)
-    return normalize(spec, opts)
+    direction = art.director.choose(opts.get("genre", "synthwave"))
+    rejected = []
+    for _ in range(3):
+        brief = naming.director.brief()
+        user = _user_prompt(opts, index, total, direction, brief)
+        if rejected:
+            user += "\nRETRY: Previous drafts were rejected. Compose a fresh COMPLETE spec " \
+                    "with different names, matching lyrics/hook and cover scene. " \
+                    "Do not just rename the old draft or add a number.\n" + "\n".join(rejected)
+        spec = chat_json(SYSTEM_PROMPT, user, max_tokens=6000, temperature=0.8, retries=2)
+        track = normalize(spec, opts)
+        reasons = naming.director.reserve(track, theme=opts.get("theme") or "")
+        if not reasons:
+            track["art_direction"] = direction
+            track["naming_direction"] = {key: brief[key] for key in ("title_form", "artist_form")}
+            return track
+        rejected.append(json.dumps({"title": track["title"], "artist": track["artist"],
+                                    "reasons": reasons}, ensure_ascii=False))
+    raise RuntimeError("Generated song/artist names kept repeating after three drafts. "
+                       "Try a different theme and generate again.")
 
 
-def _user_prompt(opts: dict, index: int, total: int) -> str:
+def _user_prompt(opts: dict, index: int, total: int, direction: dict | None = None,
+                 name_brief: dict | None = None) -> str:
     slot = ""
     if total > 1:
         if index == 0:
@@ -59,6 +81,13 @@ def _user_prompt(opts: dict, index: int, total: int) -> str:
         else:
             slot = f"Role in the set: track {index + 1} of {total} - keep the energy flowing, distinct from the others."
     theme = (opts.get("theme") or "").strip()
+    visual_brief = ""
+    if direction:
+        visual_brief = "\nASSIGNED VISUAL BRIEF (for cover art only, not the music):\n" + "\n".join(
+            f"- {key}: {value}" for key, value in direction.items())
+    naming_brief = ""
+    if name_brief:
+        naming_brief = "\nASSIGNED NAMING BRIEF:\n" + json.dumps(name_brief, ensure_ascii=False)
     return f"""Customize ONE song:
 - genre: {opts.get('genre', 'synthwave')}
 - mood: {opts.get('mood', 'energetic')}
@@ -68,6 +97,8 @@ def _user_prompt(opts: dict, index: int, total: int) -> str:
 - duration: {opts.get('duration_sec', 30)} seconds
 - lyrics language: {opts.get('language', 'en')}
 {slot}
+{visual_brief}
+{naming_brief}
 Return the JSON production spec for this song."""
 
 
@@ -106,9 +137,8 @@ def normalize(spec: dict, opts: dict) -> dict:
 
     cover_prompt = str(spec.get("cover_prompt") or "").strip()
     if not cover_prompt:
-        cover_prompt = (f"Album cover art, {mood} {genre} aesthetic"
-                        + (f", theme of {theme}" if theme else "")
-                        + ", bold composition, rich color palette, no text, no typography")
+        cover_prompt = (f"A symbolic album-cover scene about {theme or title}, "
+                        f"conveying a {mood} emotion, no text, no typography")
 
     return {
         "title": title,
