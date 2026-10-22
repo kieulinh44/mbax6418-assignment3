@@ -226,6 +226,13 @@ function renderQueue(playlist) {
     li.innerHTML = `<span class="dot"></span><span class="tag ${tag}">${tag}</span><span class="tt"></span>`;
     li.querySelector(".tt").textContent = tt;
     li.dataset.idx = i;
+    li.title = "Jump to this track (skips what's before it)";
+    li.tabIndex = 0;
+    li.setAttribute("role", "button");
+    li.addEventListener("click", () => jumpTo(i));
+    li.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); jumpTo(i); }
+    });
     els.queue.appendChild(li);
   });
 }
@@ -328,7 +335,16 @@ function next() {
   els.player.play().catch(() => showResume("⚠ Browser blocked autoplay — hit Resume to keep going."));
 }
 
-function playSetAt(idx) { session.idx = idx - 1; next(); }
+function jumpTo(idx) {
+  // Click a playbill row to skip ahead (or back) to that track
+  if (!session.manifest) return;
+  resumeMode = false;
+  session.idx = idx - 1; // next() advances to idx
+  els.playBtn.hidden = true;
+  els.playBtn.textContent = "▶ Play the set";
+  els.pauseBtn.hidden = false;
+  next();
+}
 
 function setNowPlaying(item) {
   const isSong = item.kind === "song";

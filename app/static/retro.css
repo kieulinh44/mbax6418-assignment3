@@ -162,11 +162,13 @@ input[type="checkbox"] { width: 21px; height: 21px; accent-color: var(--accent);
 .queue-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line); }
 .queue-heading h3 { margin: 0; font-size: 14px; font-weight: 500; }.queue-heading > span { font-size: 9px; letter-spacing: .1em; color: var(--muted); }
 .queue { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; max-height: 250px; overflow-y: auto; }
-.queue li { display: flex; gap: 8px; align-items: center; padding: 9px 8px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); background: var(--panel-2); font-size: 13px; }
+.queue li { display: flex; gap: 8px; align-items: center; padding: 9px 8px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); background: var(--panel-2); font-size: 13px; cursor: pointer; transition: border-color .12s, color .12s; }
 .queue .queue-empty { display: block; text-align: center; padding: 15px 5px; border: 1px dashed var(--line); line-height: 1.8; }
 .queue-empty small { font-size: 12px; }
 .queue li .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); flex: none; }
 .queue li.current { border-color: var(--aqua); color: var(--text); }
+.queue li:hover { border-color: var(--aqua); color: var(--text); }
+.queue li:focus-visible { outline: 2px solid var(--aqua); outline-offset: 1px; }
 .queue li.current .dot { background: var(--aqua); }.queue li.done .dot { background: var(--ok); }
 .queue .tag { font-size: 9px; letter-spacing: .06em; text-transform: uppercase; flex: none; }.queue .song { color: var(--coral); }.queue .dj { color: var(--aqua); }
 .queue .tt { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
