@@ -21,6 +21,7 @@ let pendingRemoval = null;
 let libraryTracks = [];
 let removing = false;
 let minVocalDuration = 60;
+let resumeMode = false;
 const removeDialog = $("remove-dialog");
 
 /* ---------------- theme ---------------- */
@@ -102,7 +103,7 @@ function bind() {
     els.durationVal.textContent = els.duration.value + "s");
   els.jamBtn.addEventListener("click", () => startJam(false));
   els.singleBtn.addEventListener("click", () => startJam(true));
-  els.playBtn.addEventListener("click", playSet);
+  els.playBtn.addEventListener("click", onPlayBtnClick);
   els.pauseBtn.addEventListener("click", togglePause);
   els.progressTrack.addEventListener("click", seekFromPointer);
   els.progressTrack.addEventListener("keydown", seekFromKeyboard);
@@ -151,7 +152,9 @@ async function startJam(single) {
     dj_persona: els.dj.value,
   };
   setControls(false);
+  resumeMode = false;
   els.playBtn.hidden = true;
+  els.playBtn.textContent = "▶ Play the set";
   els.pauseBtn.hidden = true;
   els.queue.innerHTML = "";
   renderQueuePlaceholder(options.tracks);
@@ -227,16 +230,37 @@ function renderQueue(playlist) {
   });
 }
 
+function onPlayBtnClick() {
+  if (resumeMode) {
+    // Resume at the current position instead of restarting the set
+    resumeMode = false;
+    els.playBtn.hidden = true;
+    els.playBtn.textContent = "▶ Play the set";
+    els.player.play().catch(() => showResume("Still blocked — click Resume again."));
+    return;
+  }
+  playSet();
+}
+
+function showResume(msg) {
+  resumeMode = true;
+  els.deckStatus.textContent = msg || "Paused — press Resume to keep playing.";
+  els.playBtn.hidden = false;
+  els.playBtn.textContent = "▶ Resume";
+}
+
 function playSet() {
+  resumeMode = false;
   session.idx = -1;
   els.playBtn.hidden = true;
+  els.playBtn.textContent = "▶ Play the set";
   els.pauseBtn.hidden = false;
   next();
 }
 
 function togglePause() {
   if (els.player.paused) {
-    els.player.play().catch(() => { /* autoplay blocked — Resume flow covers it */ });
+    els.player.play().catch(() => showResume());
   } else {
     els.player.pause();
   }
@@ -266,14 +290,11 @@ function seekTo(time) {
   els.player.currentTime = time;
   setProgress(els.player.duration ? time / els.player.duration * 100 : 0);
   els.pauseBtn.hidden = false;
-  els.player.play().catch(() => {
-    els.deckStatus.textContent = "Position selected — press Resume to play.";
-    els.playBtn.hidden = false;
-    els.playBtn.textContent = "▶ Resume";
-  });
+  els.player.play().catch(() => showResume("Position selected — press Resume to play."));
 }
 
 function onEnded() {
+  resumeMode = false;
   if (!session.manifest) { // a lone library track finished — nothing queued
     els.pauseBtn.hidden = true;
     els.vinyl.classList.remove("spin");
@@ -304,12 +325,7 @@ function next() {
     li.classList.toggle("playing", i === session.idx);
     li.classList.toggle("done", i < session.idx);
   });
-  els.player.play().catch(() => {
-    els.deckStatus.textContent = "⚠ Browser blocked autoplay — hit ▶ Resume to keep going.";
-    els.playBtn.hidden = false;
-    els.playBtn.textContent = "▶ Resume";
-    els.playBtn.onclick = () => { els.playBtn.hidden = true; els.player.play(); };
-  });
+  els.player.play().catch(() => showResume("⚠ Browser blocked autoplay — hit Resume to keep going."));
 }
 
 function playSetAt(idx) { session.idx = idx - 1; next(); }
@@ -439,10 +455,7 @@ function playLibraryTrack(t) {
   els.pauseBtn.hidden = false;
   setNowPlaying({ kind: "song", title: t.title, artist: t.artist, art: t.art_url, lyrics: t.lyrics });
   els.player.play().catch(() => {
-    els.deckStatus.textContent = "⚠ Click ▶ Resume to start playback.";
-    els.playBtn.hidden = false;
-    els.playBtn.textContent = "▶ Resume";
-    els.playBtn.onclick = () => { els.playBtn.hidden = true; els.player.play(); };
+    showResume("⚠ Click Resume to start playback.");
   });
 }
 
