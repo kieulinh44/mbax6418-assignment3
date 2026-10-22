@@ -168,6 +168,7 @@ def generate_song(prompt: str, lyrics: str = "", *, bpm: int | None = None,
                   key_scale: str = "", time_signature: str = "",
                   duration: float = 30.0, audio_format: str = "mp3",
                   thinking: bool = True, seed: int | None = None,
+                  vocal_language: str = "en",
                   poll_interval: float = 3.0, max_wait: float = 300.0) -> tuple[bytes, dict]:
     """Submit a text2music job, poll until done, download the audio.
 
@@ -182,8 +183,12 @@ def generate_song(prompt: str, lyrics: str = "", *, bpm: int | None = None,
         "inference_steps": 8,
         "batch_size": 1,
         "thinking": bool(thinking),
-        "use_cot_caption": True,
-        "use_cot_language": True,
+        # Qwen already supplies the arrangement and lyrics. Preserve that
+        # explicit vocal direction rather than asking the LM to rewrite it.
+        "use_cot_caption": False,
+        "use_cot_language": False,
+        "vocal_language": vocal_language,
+        "use_format": False,
     }
     if bpm:
         payload["bpm"] = int(bpm)
@@ -233,7 +238,8 @@ def generate_song(prompt: str, lyrics: str = "", *, bpm: int | None = None,
 # --------------------------------------------------------------------------
 
 def generate_speech(text: str, *, voice: str | None = None,
-                    response_format: str = "mp3", speed: float = 1.0) -> bytes:
+                    response_format: str = "mp3", speed: float = 1.0,
+                    reference_audio: bytes | None = None) -> bytes:
     """Text -> mp3 bytes. ``voice`` defaults to the configured bundled voice."""
     payload = {
         "model": config.TTS_MODEL,
@@ -242,6 +248,9 @@ def generate_speech(text: str, *, voice: str | None = None,
         "response_format": response_format,
         "speed": float(speed),
     }
+    if reference_audio:
+        payload["voice"] = "default"
+        payload["ref_audio"] = base64.b64encode(reference_audio).decode("ascii")
     r = SESSION.post(f"{config.TTS_BASE_URL}/audio/speech", json=payload, timeout=180)
     r.raise_for_status()
     return r.content

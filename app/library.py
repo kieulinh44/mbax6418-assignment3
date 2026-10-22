@@ -129,3 +129,27 @@ def _write_index_locked(index: list[dict]) -> None:
     tmp = INDEX_PATH.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(index, indent=2), encoding="utf-8")
     tmp.replace(INDEX_PATH)  # atomic-ish on POSIX + Windows
+
+
+def install_samples() -> None:
+    """Install bundled class-generated examples once; preserve user removals."""
+    source = Path(__file__).resolve().parent.parent / "samples"
+    manifest = source / "manifest.json"
+    marker = LIBRARY_DIR / ".samples-installed"
+    if marker.exists() or not manifest.exists():
+        return
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    for sample in data["tracks"]:
+        audio = source / sample["audio_file"]
+        cover = source / sample["art_file"]
+        if audio.parent != source or cover.parent != source:
+            raise ValueError("Invalid sample asset path")
+        if not audio.is_file() or not cover.is_file():
+            raise FileNotFoundError("Bundled sample audio or artwork is missing")
+    existing = list_tracks()
+    for sample in data["tracks"]:
+        if any(t.get("source_session") == data["source_session"] and t.get("title") == sample["title"] for t in existing):
+            continue
+        add(sample, source / sample["audio_file"], source / sample["art_file"],
+            session_id=data["source_session"], options=data["generation"]["options"])
+    marker.write_text("installed", encoding="utf-8")

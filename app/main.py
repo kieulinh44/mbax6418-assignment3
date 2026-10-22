@@ -4,19 +4,26 @@ Run:  .venv/Scripts/python -m uvicorn app.main:app --port 8000
 """
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, ValidationError
 
 from . import config, djs, jukebox, library
 from .clients import SESSION
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
-app = FastAPI(title="AI Jukebox", version="0.2.0")
+@asynccontextmanager
+async def lifespan(app):
+    library.install_samples()
+    yield
+
+
+app = FastAPI(title="AI Jukebox", version="0.3.0", lifespan=lifespan)
 
 app.mount("/sessions", StaticFiles(directory=jukebox.SESSIONS_DIR), name="sessions")
 app.mount("/library", StaticFiles(directory=library.LIBRARY_DIR), name="library")
@@ -54,6 +61,30 @@ def jam(opts: JamOptions) -> dict:
         options["dj_persona"] = "neon_nina"
     sid = jukebox.start(options)
     return {"id": sid}
+
+
+@app.post("/api/jam-with-voice")
+async def jam_with_voice(options: str = Form(...), reference: UploadFile = File(...)) -> dict:
+    """Reference bytes remain in memory for this generation; never saved or served."""
+    try:
+        opts = JamOptions.model_validate_json(options)
+    except ValidationError:
+        raise HTTPException(status_code=422, detail="Invalid jam options")
+    try:
+        audio = await reference.read(10 * 1024 * 1024 + 1)
+    finally:
+        await reference.close()
+    if len(audio) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Voice reference must be at most 10 MB")
+    suffix = Path(reference.filename or "").suffix.lower()
+    wav = audio.startswith(b"RIFF") and audio[8:12] == b"WAVE"
+    mp3 = audio.startswith(b"ID3") or (len(audio) > 1 and audio[0] == 255 and audio[1] & 224 == 224)
+    if not ((suffix == ".wav" and wav) or (suffix == ".mp3" and mp3)):
+        raise HTTPException(status_code=422, detail="Upload an MP3 or WAV voice reference")
+    settings = opts.model_dump()
+    if settings["dj_persona"] not in djs.PERSONAS:
+        settings["dj_persona"] = "neon_nina"
+    return {"id": jukebox.start(settings, reference_audio=audio)}
 
 
 @app.post("/api/custom-song")

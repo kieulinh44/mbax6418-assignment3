@@ -18,3 +18,8 @@ generated/
 Thumbs.db
 .idea/
 .vscode/
+
+.venv-test/
+!docs/screenshots/*.png
+!samples/**/*.mp3
+!samples/**/*.png

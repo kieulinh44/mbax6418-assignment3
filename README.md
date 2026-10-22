@@ -1,3 +1,7 @@
+> Submission status and test evidence: [verification report](docs/verification.md).
+> The team must review this report, listen to the sample songs, and complete the
+> independent extracted-ZIP check before submitting.
+
 # MBAX 6418 — Assignment 3: AI Jukebox
 
 Build an app that (1) generates **customizable songs**, (2) generates **matching cover art**,
@@ -5,9 +9,9 @@ and (3) **plays a song collection with AI-generated spoken DJ commentary** betwe
 
 Everything runs on the **class AI services — no paid APIs, no local models**.
 
-## Class services (verified working)
+## Class services
 
-| Feature | Service | Endpoint | Request format (verified) |
+| Feature | Service | Endpoint | Request format |
 |---|---|---|---|
 | Song composing, lyrics, DJ scripts | Qwen3.6-35B-A3B-AWQ-4bit · port **9001** | `POST /v1/chat/completions` | `{model, messages, max_tokens, chat_template_kwargs: {enable_thinking: false}}` — thinking disabled (verified: ~1s replies, no hidden-reasoning truncation); JSON via `response_format` |
 | Cover art | FLUX.2 klein 4B · port **9006** | `POST /v1/images/generations` | `{model, prompt, size, n}` → `data[].b64_json` (PNG) |
@@ -27,7 +31,7 @@ A "jam" session is one customizable set:
    BPM/key/time signature, cover-art prompt) *and* the DJ's spoken script.
 3. **ACE-Step** generates each song's audio; **FLUX** paints the matching cover art.
 4. **Chatterbox** speaks the DJ persona's intro, interludes, and outro.
-5. The browser plays the whole set back-to-back: intro → song → DJ chat → song → … → outro.
+5. The browser plays the whole set back-to-back: intro → track introduction → song → track introduction → song → … → outro.
 
 Sessions are generated in a background thread; the page polls progress and plays when ready.
 Artifacts live in `sessions/<id>/` (gitignored) alongside a `manifest.json` playlist.
@@ -36,16 +40,19 @@ defaults to the system preference).
 
 ## Deploy from the ZIP (grader checklist)
 
-The submission is self-contained: no credentials, no generated media, no
-third-party content — everything the app needs comes from the class endpoints.
+The ZIP includes code and three class-generated sample songs with covers in `samples/`.
+Credentials and user voice references are excluded. The samples are imported into
+the local library on first launch, so playback is available before generation.
 
 1. **Unzip** the submission. (No `.env`, no `sessions/` — by design.)
-2. **Create the environment** (once):
+2. **Install Python 3.10 or newer**, then create the environment (once):
    - Windows: `python -m venv .venv`
    - macOS/Linux: `python3 -m venv .venv`
 3. **Install dependencies**:
    - Windows: `.venv\Scripts\python -m pip install -r requirements.txt`
    - macOS/Linux: `.venv/bin/python -m pip install -r requirements.txt`
+   For the exact versions tested on Python 3.12, use `-r requirements-lock.txt`
+   instead of `-r requirements.txt`.
 4. **Credentials**: copy `.env.example` to `.env` and set `AIJ_API_KEY` to the
    key from `class-endpoints.txt` (or export it as an environment variable).
 5. **Run**:
@@ -61,6 +68,8 @@ third-party content — everything the app needs comes from the class endpoints.
    .venv/Scripts/python scripts/smoke_test.py          # Windows
    .venv/bin/python scripts/smoke_test.py              # macOS/Linux
    ```
+
+   For a vocal run, add `--vocals --duration 60`.
 
    The smoke test creates a real 1–2 song set and prints PASS/FAIL per feature:
    song generation (ACE-Step), cover art (FLUX), DJ commentary (Chatterbox),
@@ -122,7 +131,7 @@ progress values, and reduced-motion support are included.
 
 ### Short vocal songs
 
-Vocal songs now have a visible 60-second minimum in both the UI and API;
+Vocal songs have a visible 60-second minimum in both the UI and API;
 instrumental clips still allow 10 seconds. Switching vocals on raises a shorter
 slider selection to 60 seconds before submission, with an explanation beside
 the control. Direct API requests for shorter vocal songs receive a validation
@@ -133,9 +142,8 @@ conservative budget of 1.2 sung words per second. Captions request singing from
 the first beat without an instrumental intro, solo or long outro. Before
 rendering, the app prioritizes chorus/hook lines and removes instrumental
 sections; saved lyrics match those submitted to ACE-Step. Longer songs retain
-their full arrangement. Real-audio checks found that prompt changes alone did
-not reliably produce recognizable lyrics in 10–30-second generations, whereas
-both tested 60-second generations contained singing. Music generation remains
+their full arrangement. Earlier repository notes reported unreliable vocals in 10–30-second generations.
+Current test evidence and its limits are recorded in [the verification report](docs/verification.md). Music generation remains
 probabilistic; the minimum and arrangement controls are safeguards, not a
 guarantee of exact vocal timing or lyric fidelity. Existing audio is unchanged.
 
@@ -223,13 +231,51 @@ for real end-to-end music, cover art, and DJ generation.
   gitignored — never commit it, and never put a real key in code, docs, logs,
   or browser scripts. The UI talks to this server, which holds the key; the
   browser never sees it.
-- **No user uploads or voice-reference recordings** are accepted or stored.
-  The DJ voice is Chatterbox's bundled voice — no reference-audio cloning.
-  All generated output lives in `sessions/` (gitignored) and is never committed.
+- **Voice references:** optional MP3/WAV input (1–60 seconds, up to 10 MB) customizes
+  the DJ for a jam. The server holds reference bytes only while building that jam
+  and sends them to the class Chatterbox endpoint as `ref_audio`. They are never
+  written to disk, returned in status, or included in the ZIP. Clear the file input
+  to use the default voice. Chatterbox validates the recording duration and decoding.
+- Runtime output lives in gitignored `sessions/` and `library/`. The three selected
+  class-generated submission examples are explicitly included in `samples/`.
 - **No third-party music, lyrics, cover art, or voice samples are bundled.**
-  Every song, cover, and DJ clip is generated at runtime by the class services.
+  The bundled samples and newly generated music, covers, and DJ clips use the class services.
 
 ## Git workflow
 
 Work happens on personal branches (e.g. `LN-Branch`); `main` is kept stable and only
 changes via an agreed merge/PR. Nothing here is pushed anywhere without approval.
+
+## Vocal-generation fix
+
+The music client now sends `vocal_language` explicitly and disables ACE-Step caption
+rewriting and language inference (`use_cot_caption=false`, `use_cot_language=false`).
+Qwen already supplies a vocal arrangement and original lyrics; preserving those
+instructions avoids a second model rewriting the requested arrangement. This is a
+mitigation for missing singing, not a guarantee of lyric-perfect audio. Vocal requests
+with no actual words (including tag-only lyrics) fail before audio generation. Existing
+instrumental recordings cannot gain vocals retroactively; generate a new vocal song.
+See the [ACE-Step API documentation](https://github.com/ace-step/ACE-Step-1.5/blob/main/docs/en/API.md)
+for these options. Keep Include vocals checked and select at least 60 seconds.
+
+## Samples and interface evidence
+
+Three 60-second pop songs were composed by Qwen, rendered by ACE-Step, and paired
+with FLUX artwork on October 22, 2026. See `samples/manifest.json` for the titles,
+lyrics, cover prompts, generation services, theme, durations, and seeds. Samples
+contain generated media only. To replace them, generate a completed three-song jam
+and run `python scripts/export_samples.py SESSION_ID`, then listen to all three.
+
+![Interface and connected class services](docs/screenshots/interface.png)
+![Generated sample songs and covers in the collection](docs/screenshots/collection.png)
+
+## Final submission steps
+
+Review [the verification report](docs/verification.md) and [the retained starter
+prompt](docs/starter-prompt.md). Have a teammate extract a fresh ZIP, follow the setup
+instructions using class credentials, and record their actual results. Each teammate
+must contribute and review a teammate's work; this patch does not establish that.
+Push the reviewed version through the team's GitHub issue/PR process, record the
+submitted commit ID, and download the ZIP from GitHub for that same commit. Submit
+that link, commit ID, and GitHub ZIP together. A local preview ZIP is not evidence
+that the same version has been published on GitHub.

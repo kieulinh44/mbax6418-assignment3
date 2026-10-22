@@ -7,10 +7,11 @@ point at the MBAX 6418 class endpoints that were verified for this assignment.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 try:  # optional .env support
     from dotenv import load_dotenv
-    load_dotenv()
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 except ImportError:  # pragma: no cover
     pass
 

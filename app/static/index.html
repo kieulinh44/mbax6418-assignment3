@@ -54,6 +54,7 @@
           <div class="field"><div class="field-heading"><label for="tracks">Songs in the set</label><output class="val" id="tracks-val" for="tracks">3</output></div><input type="range" id="tracks" min="1" max="8" value="3"/></div>
           <div class="field"><label for="dj">Your DJ</label><select id="dj"></select></div>
         </fieldset>
+        <div class="field"><label for="voice-reference">DJ voice reference (optional MP3 or WAV)</label><input id="voice-reference" type="file" accept=".mp3,.wav,audio/mpeg,audio/wav" aria-describedby="voice-help"><p id="voice-help">Leave empty for the default voice. Use a 1–60 second recording, up to 10 MB. Used for this jam only; the app does not save your recording. Clear the selection to return to the default voice.</p></div>
         <div class="create-actions"><button id="jam-btn" class="primary">♫ Start the jam</button><button id="single-btn" class="secondary">＋ Generate one song</button></div>
         <p class="hint">A jam includes songs, covers &amp; spoken DJ breaks. One song skips the DJ. Both save to your collection.</p>
       </section>
@@ -70,7 +71,7 @@
         <div class="playback-console">
           <div class="deck-status" id="deck-status" role="status" aria-live="polite">Pick your sound, then start the jam.</div>
           <div class="progress" id="progress-track" role="slider" tabindex="0" aria-label="Seek playback position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="bar" id="bar"></div></div>
-          <div class="transport"><button id="pause-btn" class="pause" hidden aria-label="Pause playback">Ⅱ Pause</button><button id="play-btn" class="primary play" hidden>▶ Play the set</button></div>
+          <div class="transport"><button id="skip-btn" class="secondary" disabled aria-label="Skip to next clip">⏭ Skip</button><button id="pause-btn" class="pause" hidden aria-label="Pause playback">Ⅱ Pause</button><button id="play-btn" class="primary play" hidden>▶ Play the set</button></div>
           <audio id="player" preload="metadata"></audio>
         </div>
         <div class="queue-heading"><h3>On the playbill</h3><span>YOUR SESSION</span></div>

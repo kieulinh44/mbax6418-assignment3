@@ -16,7 +16,7 @@ const els = {
   libraryCount: $("library-count"), pauseBtn: $("pause-btn"),
 };
 
-const session = { id: null, pollTimer: null, manifest: null, idx: -1 };
+const session = { id: null, pollTimer: null, manifest: null, idx: -1, resumePending: false };
 let pendingRemoval = null;
 let libraryTracks = [];
 let removing = false;
@@ -104,9 +104,15 @@ function bind() {
   els.singleBtn.addEventListener("click", () => startJam(true));
   els.playBtn.addEventListener("click", playSet);
   els.pauseBtn.addEventListener("click", togglePause);
+  $("skip-btn").addEventListener("click", next);
   els.progressTrack.addEventListener("click", seekFromPointer);
   els.progressTrack.addEventListener("keydown", seekFromKeyboard);
   els.player.addEventListener("ended", onEnded);
+  els.player.addEventListener("error", () => {
+    els.vinyl.classList.remove("spin");
+    els.deckStatus.textContent = "Audio could not be loaded. Try Resume or skip to the next clip.";
+    els.pauseBtn.hidden = false;
+  });
   els.player.addEventListener("play", () => {
     els.pauseBtn.textContent = "Ⅱ Pause";
     els.pauseBtn.setAttribute("aria-label", "Pause playback");
@@ -150,6 +156,10 @@ async function startJam(single) {
     language: "en",
     dj_persona: els.dj.value,
   };
+  els.player.pause();
+  $("skip-btn").disabled = true;
+  session.manifest = null;
+  session.resumePending = false;
   setControls(false);
   els.playBtn.hidden = true;
   els.pauseBtn.hidden = true;
@@ -159,10 +169,18 @@ async function startJam(single) {
     ? `<span class="spin">◉</span> Composing your song — hang tight…`
     : `<span class="spin">◉</span> Composing songs — hang tight, this takes a minute or two…`;
   try {
-    const r = await api(single ? "/api/custom-song" : "/api/jam", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(options),
-    });
+    const reference = $("voice-reference").files[0];
+    let request = {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(options)};
+    let endpoint = single ? "/api/custom-song" : "/api/jam";
+    if (!single && reference) {
+      if (reference.size > 10 * 1024 * 1024) throw new Error("Voice reference must be at most 10 MB");
+      const form = new FormData();
+      form.append("options", JSON.stringify(options));
+      form.append("reference", reference);
+      request = {method: "POST", body: form};
+      endpoint = "/api/jam-with-voice";
+    }
+    const r = await api(endpoint, request);
     session.id = r.id;
     session.pollTimer = setInterval(poll, 2000);
     poll();
@@ -195,6 +213,7 @@ async function poll() {
 
   if (s.state === "ready") {
     clearInterval(session.pollTimer); session.pollTimer = null;
+    session.resumePending = false;
     session.manifest = s.manifest;
     refreshLibrary();
     const n = s.manifest.playlist.length;
@@ -228,6 +247,12 @@ function renderQueue(playlist) {
 }
 
 function playSet() {
+  if (session.resumePending) {
+    session.resumePending = false;
+    els.playBtn.hidden = true;
+    togglePause();
+    return;
+  }
   session.idx = -1;
   els.playBtn.hidden = true;
   els.pauseBtn.hidden = false;
@@ -236,7 +261,12 @@ function playSet() {
 
 function togglePause() {
   if (els.player.paused) {
-    els.player.play().catch(() => { /* autoplay blocked — Resume flow covers it */ });
+    els.player.play().catch(() => {
+      session.resumePending = true;
+      els.playBtn.hidden = false;
+      els.playBtn.textContent = "▶ Resume";
+      els.deckStatus.textContent = "Playback could not start. Press Resume to retry, or skip this clip.";
+    });
   } else {
     els.player.pause();
   }
@@ -269,6 +299,7 @@ function seekTo(time) {
   els.player.play().catch(() => {
     els.deckStatus.textContent = "Position selected — press Resume to play.";
     els.playBtn.hidden = false;
+    session.resumePending = true;
     els.playBtn.textContent = "▶ Resume";
   });
 }
@@ -285,15 +316,21 @@ function onEnded() {
 
 function next() {
   if (!session.manifest) return; // a lone library track ended; nothing queued
+  els.player.pause();
+  session.resumePending = false;
   session.idx++;
   const items = session.manifest.playlist;
   if (session.idx >= items.length) {
+    $("skip-btn").disabled = true;
     els.deckStatus.textContent = "Set finished — thanks for listening!";
+    els.playBtn.hidden = false;
+    els.playBtn.textContent = "▶ Replay the set";
     setProgress(0);
     els.pauseBtn.hidden = true;
     els.vinyl.classList.remove("spin");
     return;
   }
+  $("skip-btn").disabled = false;
   const item = items[session.idx];
   els.player.src = item.audio;
 
@@ -307,8 +344,8 @@ function next() {
   els.player.play().catch(() => {
     els.deckStatus.textContent = "⚠ Browser blocked autoplay — hit ▶ Resume to keep going.";
     els.playBtn.hidden = false;
+    session.resumePending = true;
     els.playBtn.textContent = "▶ Resume";
-    els.playBtn.onclick = () => { els.playBtn.hidden = true; els.player.play(); };
   });
 }
 
@@ -431,6 +468,8 @@ async function confirmRemoval() {
 }
 
 function playLibraryTrack(t) {
+  $("skip-btn").disabled = true;
+  session.resumePending = false;
   session.manifest = null; // exit set mode; play this single library track
   [...els.queue.children].forEach(li => li.classList.remove("current", "playing", "done"));
   els.player.src = t.audio_url;
@@ -441,8 +480,8 @@ function playLibraryTrack(t) {
   els.player.play().catch(() => {
     els.deckStatus.textContent = "⚠ Click ▶ Resume to start playback.";
     els.playBtn.hidden = false;
+    session.resumePending = true;
     els.playBtn.textContent = "▶ Resume";
-    els.playBtn.onclick = () => { els.playBtn.hidden = true; els.player.play(); };
   });
 }
 

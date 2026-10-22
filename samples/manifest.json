@@ -1,0 +1,84 @@
+{
+  "source_session": "a9175809821d",
+  "generation": {
+    "lyrics": "Qwen3.6-35B-A3B, class port 9001",
+    "audio": "ACE-Step 1.5 XL Turbo, class port 9007",
+    "covers": "FLUX.2 klein 4B, class port 9006",
+    "options": {
+      "genre": "pop",
+      "mood": "happy",
+      "theme": "small moments of courage on the way home",
+      "vocals": true,
+      "duration_sec": 60.0,
+      "language": "en"
+    }
+  },
+  "tracks": [
+    {
+      "title": "Pocket Light",
+      "artist": "Elara Vane",
+      "lyrics": "[Chorus]\nI unclench my fist,\nlet the shadow go.\nOne small brave step,\ntowards the glow.\nThe key fits tight,\nin the rusted lock.\nHome is here now,\nright at the top.",
+      "blurb": null,
+      "meta": {
+        "bpm": 118,
+        "genres": "indie pop, upbeat, sunny",
+        "duration": 60.0,
+        "seed": "2959325260"
+      },
+      "cover_prompt": "An intricate layered geometric still-life featuring a dusty lavender ceramic vase cracking under sage green moss growth, resting on a chalk white textured plinth. Sunlight streams through an unseen window, casting sharp geometric shadows that connect floating dried leaves and smooth river stones across the scene. The composition uses tactile paper-cut layers and subtle reflections to show a quiet moment of natural erosion and renewal, avoiding any text or human figures.",
+      "art_direction": {
+        "palette": "dusty lavender, sage green and chalk white",
+        "medium": "layered geometric illustration with intricate pattern and textured imagery",
+        "composition": "an elaborate still-life tableau with several interacting story-related objects",
+        "approach": "a natural process such as erosion, growth, tides or changing seasons",
+        "richness": "Layered tactile materials, folds, reflections, small traces of a story and a convincing surrounding location; directional light connects the objects into a narrative rather than a product shot."
+      },
+      "audio_file": "song_1.mp3",
+      "art_file": "cover_1.png"
+    },
+    {
+      "title": "Did You Look Up?",
+      "artist": "Hollow Creek",
+      "lyrics": "[Chorus]\nShoulders back, chin high\nCatch the sun before it dies\nOne deep breath, step into the light\nDid you look up tonight?\nJust for a second, brave enough to see\nThe world wide open, wild and free",
+      "blurb": null,
+      "meta": {
+        "bpm": 118,
+        "genres": "pop, indie pop, upbeat",
+        "duration": 60.0,
+        "seed": "3298025939"
+      },
+      "cover_prompt": "A tactile cut-paper collage in vermilion, parchment, and chocolate brown depicts an expansive landscape where jagged paper cliffs meet soft rolling hills. In the foreground, a stylized figure stands on a wooden plank bridge, looking up at a sky formed by layered parchment clouds pierced by sharp vermilion rays. Detailed vegetation made of textured scraps surrounds the path, while distant architectural elements resembling stone arches fade into atmospheric haze, creating a sense of journey and quiet triumph.",
+      "art_direction": {
+        "palette": "vermilion, parchment and chocolate brown",
+        "medium": "tactile cut-paper collage with layered shadows",
+        "composition": "an expansive living landscape shaped by weather, geography and the song's story",
+        "approach": "an imagined place whose architecture embodies the song's theme",
+        "richness": "Layered terrain, vegetation, architecture or signs of human life from foreground to horizon; complex atmospheric light, fine environmental texture and a memorable focal event."
+      },
+      "audio_file": "song_2.mp3",
+      "art_file": "cover_2.png"
+    },
+    {
+      "title": "I held my breath for one more step",
+      "artist": "The Quiet Departure",
+      "lyrics": "[Chorus]\nI held my breath\nFor one more step\nPast the corner store\nTo the front door\nSmall wins count too\nWhen the world feels new\nI made it home\nWith heart at peace\nNever alone",
+      "blurb": null,
+      "meta": {
+        "bpm": 118,
+        "genres": "pop, happy, upbeat",
+        "duration": 60.0,
+        "seed": "1986521364"
+      },
+      "cover_prompt": "A vintage airbrush illustration in cobalt blue and cream with a rust-red accent depicting a stylized human figure stepping over a threshold into a cozy room. The scene features intricate botanical patterns intertwining with domestic objects like a key and a lantern, creating a layered narrative of safe return. Soft gradients highlight the figure's movement, while small secondary details like floating leaves and distant stars add depth to the composition.",
+      "art_direction": {
+        "palette": "cobalt blue, cream and a small rust-red accent",
+        "medium": "vintage airbrush illustration with soft gradients",
+        "composition": "a richly illustrated narrative scene with interconnected characters, objects and patterns",
+        "approach": "a botanical or animal metaphor for the song's emotional journey",
+        "richness": "Layered visual storytelling, intricate decorative detail, a distinctive environment and small secondary discoveries; a clear hierarchy and thoughtful light keep the illustration readable at album size."
+      },
+      "audio_file": "song_3.mp3",
+      "art_file": "cover_3.png"
+    }
+  ]
+}

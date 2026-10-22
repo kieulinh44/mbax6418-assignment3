@@ -61,7 +61,10 @@ def main() -> int:
     ap.add_argument("--base", default="http://127.0.0.1:8000")
     ap.add_argument("--tracks", type=int, default=1)
     ap.add_argument("--duration", type=int, default=15)
+    ap.add_argument("--vocals", action="store_true", help="Test vocal songs (requires --duration 60 or more)")
     args = ap.parse_args()
+    if args.vocals and args.duration < 60:
+        ap.error("Vocal checks require --duration 60 or more")
     base = args.base.rstrip("/")
 
     print(f"== AI Jukebox smoke test  (server: {base}) ==")
@@ -87,7 +90,7 @@ def main() -> int:
         "mood": "energetic",
         "bpm": 110,
         "theme": "automated smoke test",
-        "vocals": False,
+        "vocals": args.vocals,
         "tracks": args.tracks,
         "duration_sec": max(10, args.duration),
         "language": "en",
@@ -139,7 +142,7 @@ def main() -> int:
         if code != 200 or len(body) < 10_000 or not body.startswith(b"ID3"):
             song_files_ok = False
     check(f"FEATURE 1 - customizable songs (ACE-Step): {len(songs)} generated",
-          len(songs) >= args.tracks and song_files_ok,
+          len(songs) >= args.tracks and song_files_ok and (not args.vocals or all(s.get("lyrics", "").strip() for s in songs)),
           ", ".join(f"{s['title']} by {s['artist']}" for s in songs) or "none")
 
     # --- feature 2: cover art ----------------------------------------------------
@@ -184,9 +187,9 @@ def main() -> int:
 
     # --- playback order -------------------------------------------------------------
     order = [i["kind"] for i in playlist]
-    expected = ["intro"] + ["song", "chat"] * len(songs)
+    expected = ["intro"] + ["chat", "song"] * len(songs)
     expected = expected[: len(songs) * 2 + 1] + ["outro"]
-    check("Playlist order: intro -> song -> DJ chat -> ... -> outro",
+    check("Playlist order: intro -> DJ introduction -> song -> ... -> outro",
           order == expected, " -> ".join(order))
 
     return _summary()

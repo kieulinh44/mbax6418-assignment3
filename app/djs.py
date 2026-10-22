@@ -43,8 +43,8 @@ def script_for(persona_id: str, tracks: list[dict], options: dict | None = None)
     lines = ["Track list for the set:"]
     for i, t in enumerate(tracks, 1):
         lines.append(
-            f"{i}. Title \"{t['title']}\" by {t['artist']} -- {t.get('genres', '')} "
-            f"vibe, {t.get('bpm', '?')} BPM, {(t.get('blurb') or t.get('caption') or '')[:140]}"
+            f"{i}. Title \"{t['title']}\" by {t['artist']} -- {(t.get('meta') or {}).get('genres', t.get('genres', ''))} "
+            f"vibe, {(t.get('meta') or {}).get('bpm', t.get('bpm', '?'))} BPM, {(t.get('blurb') or t.get('caption') or '')[:140]}"
         )
     user = (
         f"DJ persona: {persona['tone']}.\n"
@@ -52,15 +52,34 @@ def script_for(persona_id: str, tracks: list[dict], options: dict | None = None)
         + "\n".join(lines)
         + "\nReturn the JSON script."
     )
-    return chat_json(SYSTEM_PROMPT, user, max_tokens=4000, temperature=0.85, retries=2)
+    user += f"\nThe tracks array MUST contain exactly {len(tracks)} strings."
+    error = "Invalid DJ script"
+    for attempt in range(3):
+        script = chat_json(SYSTEM_PROMPT, user, max_tokens=4000, temperature=0.85, retries=2)
+        clips = script.get("tracks")
+        if not isinstance(clips, list) or len(clips) != len(tracks):
+            error = "DJ script must contain exactly one introduction per song. Please try again."
+        elif any(not isinstance(line, str) or not line.strip()
+                 for line in [script.get("intro"), *clips, script.get("outro")]):
+            error = "DJ script contains missing or empty speech. Please try again."
+        else:
+            return script
+        user += f"\nPrevious draft invalid: {error} Return exactly {len(tracks)} track introductions."
+    raise ValueError(error)
 
 
-def render_script(script: dict, persona_id: str) -> dict:
+
+def render_script(script: dict, persona_id: str, *, reference_audio: bytes | None = None) -> dict:
     """Speak every clip with Chatterbox. Returns {intro, tracks: [bytes], outro}."""
     persona = PERSONAS.get(persona_id, PERSONAS["neon_nina"])
     speed = persona["speed"]
+    def speak(text):
+        kwargs = {"speed": speed}
+        if reference_audio:
+            kwargs["reference_audio"] = reference_audio
+        return generate_speech(text, **kwargs)
     return {
-        "intro": generate_speech(script["intro"], speed=speed),
-        "tracks": [generate_speech(clip, speed=speed) for clip in script["tracks"]],
-        "outro": generate_speech(script["outro"], speed=speed),
+        "intro": speak(script["intro"]),
+        "tracks": [speak(clip) for clip in script["tracks"]],
+        "outro": speak(script["outro"]),
     }

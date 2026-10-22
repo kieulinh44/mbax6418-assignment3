@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import threading
 import uuid
 from pathlib import Path
@@ -33,7 +34,7 @@ _sessions: dict[str, dict] = {}
 # Public API used by the FastAPI layer
 # --------------------------------------------------------------------------
 
-def start(options: dict) -> str:
+def start(options: dict, *, reference_audio: bytes | None = None) -> str:
     sid = uuid.uuid4().hex[:12]
     (SESSIONS_DIR / sid).mkdir(parents=True, exist_ok=True)
     total = int(options.get("tracks", config.DEFAULT_TRACKS))
@@ -48,7 +49,7 @@ def start(options: dict) -> str:
             "progress": {"stage": "queued", "done": 0, "total": units},
             "manifest": None,
         }
-    threading.Thread(target=_build, args=(sid, options, total), daemon=True).start()
+    threading.Thread(target=_build, args=(sid, options, total, reference_audio), daemon=True).start()
     return sid
 
 
@@ -70,7 +71,7 @@ def _update(sid: str, **fields) -> None:
 # Background builder
 # --------------------------------------------------------------------------
 
-def _build(sid: str, options: dict, total: int) -> None:
+def _build(sid: str, options: dict, total: int, reference_audio: bytes | None = None) -> None:
     sdir = SESSIONS_DIR / sid
     custom_single = bool(options.get("custom_single"))
     steps = 0  # monotonic work counter for progress
@@ -94,11 +95,9 @@ def _build(sid: str, options: dict, total: int) -> None:
             (sdir / f"song_{i + 1}.mp3").write_bytes(audio)
             steps += 1
             _update(sid, progress={"stage": f"painting cover {i + 1}/{total}", "done": steps})
-            try:
-                cover = art_mod.cover_for(spec)
-            except Exception as exc:  # noqa: BLE001 - cover is non-fatal
-                log.warning("cover failed for %s: %s", spec.get("title"), exc)
-                cover = b""
+            cover = art_mod.cover_for(spec)
+            if not cover:
+                raise RuntimeError("FLUX returned an empty cover. Please try generating again.")
             if cover:
                 (sdir / f"cover_{i + 1}.png").write_bytes(cover)
             tracks.append({
@@ -136,7 +135,8 @@ def _build(sid: str, options: dict, total: int) -> None:
             script = djs_mod.script_for(persona, tracks, options)
             steps += 1
             _update(sid, progress={"stage": "recording DJ voice", "done": steps})
-            speech = djs_mod.render_script(script, persona)
+            speech = (djs_mod.render_script(script, persona, reference_audio=reference_audio)
+                      if reference_audio else djs_mod.render_script(script, persona))
             (sdir / "dj_intro.mp3").write_bytes(speech["intro"])
             for i, clip in enumerate(speech["tracks"]):
                 (sdir / f"dj_chat_{i + 1}.mp3").write_bytes(clip)
@@ -154,7 +154,6 @@ def _build(sid: str, options: dict, total: int) -> None:
                 "meta": {},
             }]
             for i, t in enumerate(tracks):
-                playlist.append(t)
                 playlist.append({
                     "kind": "chat",
                     "title": "DJ interlude",
@@ -162,6 +161,7 @@ def _build(sid: str, options: dict, total: int) -> None:
                     "audio": f"/sessions/{sid}/dj_chat_{i + 1}.mp3",
                     "meta": {},
                 })
+                playlist.append(t)
             playlist.append({
                 "kind": "outro",
                 "title": "Thanks for listening",
@@ -194,9 +194,11 @@ def _generate_song(spec: dict, options: dict):
             raise ValueError(f'Vocal songs need at least {config.MIN_VOCAL_DURATION} seconds. '
                              'Disable vocals for shorter clips.')
         caption, lyrics = songs_mod.short_vocal_arrangement(spec['caption'], spec['lyrics'], duration)
-        if not lyrics.strip():
+        if not re.search(r'[^\W\d_]', re.sub(r'\[[^\]]*\]', '', lyrics), re.UNICODE):
             raise ValueError('Vocal song has no singable lyrics. Please generate again.')
         # Persist exactly the lyrics/arrangement submitted to the music service.
+        if duration > 60:
+            caption = 'Vocal song with a clearly audible lead singer performing the supplied lyrics. ' + caption
         spec['caption'], spec['lyrics'] = caption, lyrics
     else:
         spec['lyrics'] = ''
@@ -209,4 +211,5 @@ def _generate_song(spec: dict, options: dict):
         duration=duration,
         thinking=True,
         audio_format="mp3",
+        vocal_language=spec.get("vocal_language") or options.get("language", "en"),
     )
