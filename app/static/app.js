@@ -17,6 +17,10 @@ const els = {
 };
 
 const session = { id: null, pollTimer: null, manifest: null, idx: -1 };
+let pendingRemoval = null;
+let libraryTracks = [];
+let removing = false;
+const removeDialog = $("remove-dialog");
 
 /* ---------------- theme ---------------- */
 
@@ -83,6 +87,10 @@ function fillSelect(sel, entries, def) {
 }
 
 function bind() {
+  $("remove-cancel").addEventListener("click", () => removeDialog.close());
+  removeDialog.addEventListener("close", () => { pendingRemoval = null; });
+  removeDialog.addEventListener("cancel", (event) => { if (removing) event.preventDefault(); });
+  $("remove-confirm").addEventListener("click", confirmRemoval);
   els.bpm.addEventListener("input", () =>
     els.bpmVal.textContent = els.bpm.value === "0" ? "auto" : els.bpm.value + " BPM");
   els.tracks.addEventListener("input", () => els.tracksVal.textContent = els.tracks.value);
@@ -290,6 +298,7 @@ async function refreshLibrary() {
 }
 
 function renderLibrary(tracks) {
+  libraryTracks = tracks;
   els.libraryCount.textContent = tracks.length ? `(${tracks.length})` : "";
   els.libraryList.innerHTML = "";
   if (!tracks.length) {
@@ -311,9 +320,65 @@ function renderLibrary(tracks) {
       `${thumb}<div class="tt"><div class="t">${escapeHtml(t.title)}</div>` +
       `<div class="a">${escapeHtml(t.artist)}</div>` +
       `<div class="track-meta"><span class="chip">${t.bpm || "?"} BPM</span>${vocal}</div></div>` +
-      `<button class="mini play-li" aria-label="Play ${escapeHtml(t.title)}" title="Play ${escapeHtml(t.title)}">▶</button>`;
+      `<div class="track-actions"><button class="mini play-li" aria-label="Play ${escapeHtml(t.title)}" title="Play ${escapeHtml(t.title)}">▶</button>` +
+      `<button class="remove-li" aria-label="Remove ${escapeHtml(t.title)}">Remove</button></div>`;
     li.querySelector(".play-li").addEventListener("click", () => playLibraryTrack(t));
+    li.querySelector(".remove-li").addEventListener("click", () => {
+      pendingRemoval = t;
+      $("remove-title").textContent = t.title;
+      $("remove-status").textContent = "";
+      removeDialog.showModal();
+      $("remove-cancel").focus();
+    });
     els.libraryList.appendChild(li);
+  }
+}
+
+async function confirmRemoval() {
+  if (!pendingRemoval || removing) return;
+  const track = pendingRemoval;
+  removing = true;
+  $("remove-confirm").disabled = true;
+  $("remove-cancel").disabled = true;
+  $("remove-status").textContent = "Removing saved song…";
+  try {
+    await api("/api/library/" + encodeURIComponent(track.id), { method: "DELETE" });
+    // Compare the actual loaded copy, not title/session identity. Session audio
+    // and a different library song must continue without interruption.
+    if (els.player.getAttribute("src") && new URL(els.player.src).pathname === `/library/tracks/${track.id}/audio.mp3`) {
+      els.player.pause();
+      els.player.removeAttribute("src");
+      els.player.load();
+      session.manifest = null;
+      session.idx = -1;
+      els.playBtn.hidden = true;
+      els.playBtn.onclick = null;
+      els.pauseBtn.hidden = true;
+      els.pauseBtn.textContent = "Ⅱ Pause";
+      els.pauseBtn.setAttribute("aria-label", "Pause playback");
+      els.vinyl.classList.remove("spin");
+      els.art.classList.remove("show");
+      els.art.removeAttribute("src");
+      els.kind.textContent = "READY WHEN YOU ARE";
+      els.title.textContent = "Good things are about to spin.";
+      els.artist.textContent = "Create a record or pick one from the collection.";
+      els.lyricsBox.hidden = true;
+      els.lyricsText.textContent = "";
+      els.deckStatus.textContent = "Song removed. Pick another record to play.";
+      setProgress(0);
+      [...els.queue.children].forEach(li => li.classList.remove("current", "playing", "done"));
+    }
+    renderLibrary(libraryTracks.filter(t => t.id !== track.id));
+    await refreshLibrary();
+    removeDialog.close();
+    $("library-status").textContent = `Removed “${track.title}” from your collection. ${libraryTracks.length} saved ${libraryTracks.length === 1 ? "song remains" : "songs remain"}.`;
+    $("collection-heading").focus();
+  } catch (error) {
+    $("remove-status").textContent = "Could not remove song: " + error.message + ". The song is still listed. Check saved files, then try again or cancel.";
+  } finally {
+    removing = false;
+    $("remove-confirm").disabled = false;
+    $("remove-cancel").disabled = false;
   }
 }
 

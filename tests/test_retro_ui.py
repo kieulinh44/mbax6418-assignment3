@@ -90,7 +90,7 @@ class RetroInterfaceTests(unittest.TestCase):
             wav.setframerate(8000)
             wav.writeframes(b"\0\0" * 8000 * 10)
         self.page.route("**/ui-test.wav", lambda route: route.fulfill(body=audio.getvalue(), content_type="audio/wav"))
-        self.page.evaluate("renderLibrary([{title: 'Playback test', artist: 'Test artist', audio_url: '/ui-test.wav', lyrics: 'Test lyrics'}])")
+        self.page.evaluate("renderLibrary([{id: 'abcdef12', title: 'Playback test', artist: 'Test artist', audio_url: '/ui-test.wav', lyrics: 'Test lyrics'}])")
         self.page.get_by_role("button", name="Play Playback test", exact=True).click()
         self.page.wait_for_function("!document.querySelector('#player').paused && document.querySelector('#player').currentTime > 0")
         self.page.get_by_role("button", name="Pause playback", exact=True).click()
@@ -128,7 +128,7 @@ class RetroInterfaceTests(unittest.TestCase):
         self.assertTrue(self.page.get_by_role("button", name="Switch to dark mode").is_visible())
 
     def test_collection_play_buttons_identify_the_song(self):
-        self.page.evaluate("renderLibrary([{title: 'Test record', artist: 'Test artist', bpm: 110, vocals: true}])")
+        self.page.evaluate("renderLibrary([{id: 'abcdef12', title: 'Test record', artist: 'Test artist', bpm: 110, vocals: true}])")
         button = self.page.get_by_role("button", name="Play Test record", exact=True)
         self.assertEqual(button.count(), 1)
         box = button.bounding_box()
@@ -147,6 +147,153 @@ class RetroInterfaceTests(unittest.TestCase):
         self.assertTrue(requests[0].url.endswith("/api/jam"))
         self.assertEqual(requests[0].post_data_json["tracks"], 3)
         self.assertTrue(self.page.locator("#single-btn").is_disabled())
+
+    def collection_fixture(self):
+        self.records = [{'id': 'abcdef12', 'title': 'Fixture record', 'artist': 'Fixture artist',
+                         'audio_url': '/library/tracks/abcdef12/audio.mp3', 'lyrics': 'Fixture lyrics'}]
+        self.deletes = []
+        self.page.route('**/api/library', lambda route: route.fulfill(json={'tracks': self.records}))
+        self.page.route('**/api/library/*', lambda route: (self.deletes.append(route.request.method), route.fulfill(status=500, json={'detail': 'Fixture disk error'})))
+        self.page.evaluate('refreshLibrary()')
+
+    def play_collection_fixture(self):
+        audio = io.BytesIO()
+        with wave.open(audio, 'wb') as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(8000)
+            wav.writeframes(b'\0\0' * 8000 * 30)
+        self.page.route('**/library/tracks/*/audio.mp3', lambda route: route.fulfill(body=audio.getvalue(), content_type='audio/wav'))
+        self.page.route('**/sessions/original/audio.mp3', lambda route: route.fulfill(body=audio.getvalue(), content_type='audio/wav'))
+        self.page.get_by_role('button', name='Play Fixture record', exact=True).click()
+        self.page.wait_for_function('!player.paused && player.currentTime > 0')
+
+    def confirm_fixture_success(self):
+        def delete(route):
+            self.records.clear()
+            route.fulfill(json={'removed': 'abcdef12'})
+        self.page.route('**/api/library/abcdef12', delete)
+        self.page.get_by_role('button', name='Remove Fixture record', exact=True).click()
+        self.page.get_by_role('button', name='Remove song', exact=True).click()
+        expect(self.page.get_by_role('dialog')).not_to_be_visible()
+
+    def test_remove_confirmation_cancel_is_safe_and_keyboard_accessible(self):
+        self.collection_fixture()
+        remove = self.page.get_by_role('button', name='Remove Fixture record', exact=True)
+        remove.click()
+        dialog = self.page.get_by_role('dialog', name='Remove from collection?')
+        expect(dialog).to_be_visible()
+        expect(dialog).to_contain_text('Fixture record')
+        expect(dialog).to_contain_text('Original session files are kept')
+        expect(dialog.get_by_role('button', name='Cancel', exact=True)).to_be_focused()
+        self.page.keyboard.press('Escape')
+        expect(dialog).not_to_be_visible()
+        expect(remove).to_be_focused()
+        remove.click()
+        dialog.get_by_role('button', name='Cancel', exact=True).click()
+        expect(dialog).not_to_be_visible()
+        self.assertEqual(self.deletes, [])
+        expect(self.page.locator('#library-list')).to_contain_text('Fixture record')
+
+    def test_remove_success_waits_for_server_then_updates_empty_state(self):
+        self.collection_fixture()
+        held = []
+        self.page.route('**/api/library/abcdef12', lambda route: held.append(route))
+        self.page.get_by_role('button', name='Remove Fixture record', exact=True).click()
+        self.page.get_by_role('button', name='Remove song', exact=True).click()
+        expect(self.page.locator('#library-list')).to_contain_text('Fixture record')
+        expect(self.page.get_by_role('button', name='Remove song', exact=True)).to_be_disabled()
+        self.assertEqual(held[0].request.method, 'DELETE')
+        self.records.clear()
+        held[0].fulfill(json={'removed': 'abcdef12'})
+        expect(self.page.get_by_role('dialog')).not_to_be_visible()
+        expect(self.page.locator('#library-list')).to_contain_text('No songs yet')
+        expect(self.page.locator('#library-count')).to_have_text('')
+        expect(self.page.locator('#library-status')).to_contain_text('Removed “Fixture record”')
+        expect(self.page.locator('#collection-heading')).to_be_focused()
+
+    def test_remove_error_keeps_song_and_allows_retry_or_cancel(self):
+        self.collection_fixture()
+        self.play_collection_fixture()
+        self.page.get_by_role('button', name='Remove Fixture record', exact=True).click()
+        self.page.get_by_role('button', name='Remove song', exact=True).click()
+        dialog = self.page.get_by_role('dialog')
+        expect(dialog).to_be_visible()
+        expect(dialog.get_by_role('status')).to_contain_text('Fixture disk error')
+        expect(self.page.locator('#library-list')).to_contain_text('Fixture record')
+        expect(self.page.locator('#library-count')).to_have_text('(1)')
+        expect(dialog.get_by_role('button', name='Remove song', exact=True)).to_be_enabled()
+        expect(dialog.get_by_role('button', name='Cancel', exact=True)).to_be_enabled()
+        self.assertEqual(self.deletes, ['DELETE'])
+        self.assertFalse(self.page.locator('#player').evaluate('el => el.paused'))
+        expect(self.page.locator('#title')).to_have_text('Fixture record')
+        dialog.get_by_role('button', name='Cancel', exact=True).click()
+
+    def test_remove_current_library_audio_resets_the_player(self):
+        self.collection_fixture()
+        self.play_collection_fixture()
+        self.page.evaluate('setProgress(35)')
+        self.confirm_fixture_success()
+        player = self.page.locator('#player')
+        self.assertTrue(player.evaluate('el => el.paused'))
+        self.assertIsNone(player.get_attribute('src'))
+        expect(self.page.locator('#pause-btn')).not_to_be_visible()
+        expect(self.page.locator('#play-btn')).not_to_be_visible()
+        expect(self.page.locator('#title')).to_have_text('Good things are about to spin.')
+        expect(self.page.locator('#kind')).to_have_text('READY WHEN YOU ARE')
+        expect(self.page.locator('#lyrics-box')).not_to_be_visible()
+        self.assertIsNone(self.page.locator('#art').get_attribute('src'))
+        self.assertNotIn('spin', self.page.locator('#vinyl').get_attribute('class') or '')
+        self.assertEqual(self.page.get_by_role('progressbar').get_attribute('aria-valuenow'), '0')
+
+    def test_remove_unrelated_library_or_original_session_does_not_stop_playback(self):
+        for source in ('/library/tracks/1234abcd/audio.mp3', '/sessions/original/audio.mp3'):
+            with self.subTest(source=source):
+                self.collection_fixture()
+                self.play_collection_fixture()
+                self.page.evaluate("source => { session.manifest = {playlist: [{audio: source}]}; session.idx = 0; player.src = source; player.play(); }", source)
+                self.page.wait_for_function('!player.paused && player.currentTime > 0')
+                self.confirm_fixture_success()
+                self.assertEqual(self.page.locator('#player').get_attribute('src'), source)
+                self.assertFalse(self.page.locator('#player').evaluate('el => el.paused'))
+                self.assertEqual(self.page.evaluate('session.idx'), 0)
+                self.assertIsNotNone(self.page.evaluate('session.manifest'))
+                expect(self.page.locator('#pause-btn')).to_be_visible()
+
+    def test_remove_one_of_two_updates_count_and_retains_other_song(self):
+        self.collection_fixture()
+        other = {**self.records[0], 'id': '1234abcd', 'title': 'Keep this record'}
+        self.records.append(other)
+        self.page.evaluate('refreshLibrary()')
+        def delete(route):
+            self.records[:] = [other]
+            route.fulfill(json={'removed': 'abcdef12'})
+        self.page.route('**/api/library/abcdef12', delete)
+        self.page.get_by_role('button', name='Remove Fixture record', exact=True).click()
+        self.page.get_by_role('button', name='Remove song', exact=True).click()
+        expect(self.page.locator('#library-count')).to_have_text('(1)')
+        expect(self.page.locator('#library-list')).to_contain_text('Keep this record')
+        expect(self.page.locator('#library-list')).not_to_contain_text('Fixture record')
+
+    def test_remove_controls_and_themed_dialog_fit_mobile_without_overflow(self):
+        self.collection_fixture()
+        for theme in ('dark', 'light'):
+            for width in (320, 390, 740, 1440):
+                with self.subTest(theme=theme, width=width):
+                    self.page.set_viewport_size({'width': width, 'height': 1000})
+                    self.page.evaluate('theme => applyTheme(theme)', theme)
+                    remove = self.page.get_by_role('button', name='Remove Fixture record', exact=True)
+                    box = remove.bounding_box()
+                    row = self.page.locator('#library-list li').bounding_box()
+                    assert box and row
+                    self.assertGreaterEqual(box['height'], 44)
+                    self.assertLessEqual(box['x'] + box['width'], row['x'] + row['width'])
+                    remove.click()
+                    dialog = self.page.get_by_role('dialog')
+                    self.assertTrue(dialog.evaluate("el => getComputedStyle(el).backgroundColor === getComputedStyle(document.querySelector('.panel')).backgroundColor"))
+                    self.assertFalse(self.page.evaluate('document.documentElement.scrollWidth > innerWidth'))
+                    self.assertFalse(dialog.evaluate('el => el.scrollWidth > el.clientWidth'))
+                    dialog.get_by_role('button', name='Cancel', exact=True).click()
 
     def test_creation_and_playback_have_named_landmarks(self):
         self.assertEqual(self.page.get_by_role("heading", name="Create your record", exact=True).count(), 1)

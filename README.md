@@ -120,7 +120,65 @@ Tablet and mobile layouts reflow without horizontal scrolling. Keyboard focus,
 a skip link, named playback buttons, live status announcements, accessible
 progress values, and reduced-motion support are included.
 
-### Frontend regression tests
+### Title and artist variety
+
+Naming forms rotate independently across genres: titles may be a single word,
+a question, a conversational fragment, a concrete detail, or a plainspoken
+sentence. Fictional artist identities vary between solo performers, mononyms,
+duos, and bands instead of always using the same adjective-noun pattern.
+
+The composer sees recent titles/artists and frequently reused vocabulary from
+the whole collection, not only the chosen genre. A deterministic check rejects
+exact/near duplicates, superficial punctuation/plural/numbered variants, and
+overworked name words. Artist identities also avoid previously used distinctive
+name words/surnames, not just identical full names. Listener-requested subject
+words can still appear in titles. Accepted names are reserved before audio
+generation so pending tracks in a set and simultaneous requests also inform
+later drafts. Saved collection names are reloaded after restarts. Form rotation
+is process-local, as are reservations for the latest 200 accepted specs. An
+accepted name from a subsequently failed session remains reserved until eviction
+or restart.
+
+Conflicting names trigger up to three complete composition drafts, preserving
+the connection between title, lyric hook, and cover scene. There is no post-hoc
+number suffix or random rename of finished audio. Persistent conflicts produce
+an explicit error instead of silently accepting a duplicate. Existing songs
+and artist names are never renamed by this change. These are lexical checks,
+not a guarantee of semantic uniqueness or a worldwide artist-name search.
+
+### Cover-art variety
+
+Every new song receives a varied visual brief before the songwriter creates
+its cover prompt: palette, medium, narrative approach, and a matched composition
+and richness treatment. Compositions rotate between cinematic worlds, surreal
+environments, intricate illustrations, environmental portraits, still-life
+tableaux, landscapes, action scenes, photomontage, and bold graphic designs.
+Most develop layered scenes, lighting, textures and secondary story details;
+the occasional more restrained graphic treatment provides contrast. Covers are
+not all reduced to isolated objects or flat icons on empty backgrounds.
+
+Palette, medium, composition and approach use shuffled pools per genre, shared
+across sets and single-song requests. Richness stays coupled to its composition
+so their instructions agree. Choices are exhausted before reuse, and reshuffling avoids
+immediate repeats. The pools are not tied to genre stereotypes: synthwave can
+receive a linocut, monochrome photograph, textile illustration, or oil painting
+instead of always getting a pink/blue neon cityscape.
+
+The songwriter grounds the scene in the song's theme/story, and the image
+renderer also receives the assigned visual brief. The brief and cover prompt
+are saved with newly generated session/library tracks. Existing covers are not
+changed. Shuffle history is process-local; restarting begins a fresh random
+order. Visual variety is guided, not a guarantee that every AI image is unique.
+
+### Removing collection tracks
+
+Use a song's **Remove** action and confirm its title. Removal deletes the saved
+collection entry and that entry's copied audio/cover files, but preserves the
+original generated DJ-session files. Cancel leaves the song untouched. Removing
+the currently selected library song stops that playback; other songs and session
+playlists are not deleted.
+
+### Regression tests
 
 With the app running on port 8003 (or set `AIJ_TEST_URL` to its URL):
 
@@ -129,6 +187,10 @@ uv pip install --python .venv/bin/python -r requirements-dev.txt
 .venv/bin/python -m playwright install chromium
 .venv/bin/python -m unittest discover -s tests -v
 ```
+
+Art-direction unit tests check variation, shuffle boundaries, concurrency,
+and propagation into composer, renderer, and saved metadata. Collection-removal
+tests use isolated temporary directories, never the real collection.
 
 The browser tests use explicitly intercepted API fixtures for deterministic
 UI-state checks and a silent WAV for real browser pause/resume testing; they

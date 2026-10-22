@@ -108,6 +108,8 @@ def _build(sid: str, options: dict, total: int) -> None:
                 "blurb": spec["caption"][:220],
                 "audio": f"/sessions/{sid}/song_{i + 1}.mp3",
                 "art": f"/sessions/{sid}/cover_{i + 1}.png" if cover else "",
+                "art_direction": spec.get("art_direction", {}),
+                "cover_prompt": spec.get("cover_prompt", ""),
                 "meta": {
                     "bpm": spec["bpm"],
                     "genres": spec["genres"],
