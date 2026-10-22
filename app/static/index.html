@@ -49,7 +49,7 @@
         <div class="field"><div class="field-heading"><label for="bpm">Tempo</label><output class="val" id="bpm-val" for="bpm">auto</output></div><input type="range" id="bpm" min="0" max="170" value="0" step="1" aria-describedby="tempo-help"/><span class="field-help" id="tempo-help">Auto lets the composer choose the pace.</span></div>
         <div class="field"><label for="theme">Theme or inspiration</label><input type="text" id="theme" placeholder="A midnight drive, a summer love…" maxlength="500"/></div>
         <label class="field check" for="vocals"><input type="checkbox" id="vocals" checked/><span>Include vocals<small>Original lyrics, written for your song</small></span></label>
-        <div class="field"><div class="field-heading"><label for="duration">Song length</label><output class="val" id="duration-val" for="duration">30s</output></div><input type="range" id="duration" min="10" max="120" value="30" step="5"/></div>
+        <div class="field"><div class="field-heading"><label for="duration">Song length</label><output class="val" id="duration-val" for="duration">60s</output></div><input type="range" id="duration" min="60" max="120" value="60" step="5" aria-describedby="duration-help"/><small id="duration-help">Vocal songs need at least 60 seconds so the singing has time to start.</small></div>
         <fieldset class="set-options"><legend>For a full DJ set</legend>
           <div class="field"><div class="field-heading"><label for="tracks">Songs in the set</label><output class="val" id="tracks-val" for="tracks">3</output></div><input type="range" id="tracks" min="1" max="8" value="3"/></div>
           <div class="field"><label for="dj">Your DJ</label><select id="dj"></select></div>

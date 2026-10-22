@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from . import config, djs, jukebox, library
 from .clients import SESSION
@@ -33,6 +33,13 @@ class JamOptions(BaseModel):
     duration_sec: float = Field(default=config.DEFAULT_DURATION, ge=10, le=config.MAX_DURATION)
     language: str = "en"
     dj_persona: str = "neon_nina"
+
+    @model_validator(mode='after')
+    def validate_vocal_duration(self):
+        if self.vocals and self.duration_sec < config.MIN_VOCAL_DURATION:
+            raise ValueError(f'Vocal songs need at least {config.MIN_VOCAL_DURATION} seconds '
+                             'so singing has time to start. Disable vocals for shorter clips.')
+        return self
 
 
 @app.get("/")
@@ -96,6 +103,7 @@ def presets() -> dict:
         "personas": [{"id": k, **v} for k, v in djs.PERSONAS.items()],
         "max_tracks": config.MAX_TRACKS,
         "max_duration": config.MAX_DURATION,
+        "min_vocal_duration": config.MIN_VOCAL_DURATION,
     }
 
 

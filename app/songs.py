@@ -8,19 +8,20 @@ by Qwen (9001) and normalized here.
 from __future__ import annotations
 
 import json
+import re
 
 from .clients import chat_json
-from . import art, naming
+from . import art, naming, config
 
 SYSTEM_PROMPT = """You are the songwriting brain of an AI jukebox. You turn a listener's customization into a complete music-production order for a text-to-music model (ACE-Step) and write the lyrics.
 
 Songwriting craft (apply it):
-- Structure: [Intro] [Verse 1] [Chorus] [Verse 2] [Chorus] [Bridge] [Final Chorus] [Outro] with a strong HOOK (a memorable title phrase) landing in the chorus.
+- Structure must fit the requested duration and ARRANGEMENT brief below, which overrides full-song conventions. A short clip is a complete compact vocal hook, NOT the opening of a longer song. Longer songs may use verse/chorus/bridge sections with a strong title HOOK.
 - Show, don't tell: concrete images over emotion-labels. Keep the meter singable; line-to-line syllable counts should match so it can be sung.
 - Mix perfect and slant rhymes. Avoid cliches on autopilot.
 - Emotional arc: verses lower and sparser, chorus bigger and hooky, bridge a shift, final chorus the peak.
 
-ACE-Step caption craft: describe genre + mood + era + instruments + vocal style + production + a dynamic arc (sparse start, build, peak in the chorus). Describe the journey, not just a genre label, in 2-4 sentences.
+ACE-Step caption craft: describe genre + mood + era + instruments + vocal style + production and a duration-appropriate dynamic arc. For short vocal songs, lead with an audible singer from the first beat, not a sparse instrumental opening or delayed chorus. Describe the journey, not just a genre label, in 2-4 sentences.
 
 Rules:
 - Respond with ONE valid JSON object only. No markdown fences, no extra text.
@@ -88,14 +89,25 @@ def _user_prompt(opts: dict, index: int, total: int, direction: dict | None = No
     naming_brief = ""
     if name_brief:
         naming_brief = "\nASSIGNED NAMING BRIEF:\n" + json.dumps(name_brief, ensure_ascii=False)
+    duration = float(opts.get('duration_sec', config.DEFAULT_DURATION))
+    arrangement = ''
+    if opts.get('vocals', True) and duration <= 60:
+        arrangement = (f'ARRANGEMENT: Start singing immediately on the first beat. '
+                       f'No instrumental intro, solo, breakdown or long outro. '
+                       f'Write at most {int(duration * 1.2)} sung words total, '
+                       'starting with [Chorus] and the title hook. Use short singable lines. '
+                       'Finish the vocal phrase inside the requested duration; '
+                       'describe a compact vocal-led arrangement in the caption. '
+                       'Set instrumental=false. Do not write a full-length song.')
     return f"""Customize ONE song:
 - genre: {opts.get('genre', 'synthwave')}
 - mood: {opts.get('mood', 'energetic')}
 - tempo: {opts.get('bpm') or 'auto (sensible for the genre)'} BPM
 - theme/keywords: {theme or 'none - invent something vivid'}
 - vocals: {'enabled - write real lyrics' if opts.get('vocals', True) else 'disabled - instrumental only'}
-- duration: {opts.get('duration_sec', 30)} seconds
+- duration: {opts.get('duration_sec', config.DEFAULT_DURATION)} seconds
 - lyrics language: {opts.get('language', 'en')}
+{arrangement}
 {slot}
 {visual_brief}
 {naming_brief}
@@ -116,9 +128,11 @@ def normalize(spec: dict, opts: dict) -> dict:
     if not caption:
         caption = f"A {mood} {genre} track{f' about {theme}' if theme else ''} with a driving arrangement and clear dynamic arc."
     lyrics = str(spec.get("lyrics") or "").strip() if vocals else ""
-    instrumental = (not vocals) or bool(spec.get("instrumental"))
+    instrumental = not vocals
     if instrumental:
         lyrics = ""
+    elif float(opts.get('duration_sec', config.DEFAULT_DURATION)) <= 60:
+        caption, lyrics = short_vocal_arrangement(caption, lyrics, float(opts.get('duration_sec', config.DEFAULT_DURATION)))
 
     try:
         bpm = int(spec.get("bpm") or opts.get("bpm") or 0)
@@ -153,6 +167,55 @@ def normalize(spec: dict, opts: dict) -> dict:
         "genres": str(spec.get("genres") or genre).strip()[:80],
         "cover_prompt": cover_prompt,
     }
+
+
+def short_vocal_arrangement(caption: str, lyrics: str, duration: float) -> tuple[str, str]:
+    """Keep short vocal clips hook-first and within a conservative singing budget.
+
+    Applied both after composition and at the audio boundary for older specs.
+    Whole lines are preferred; a single oversized line is trimmed as a fallback.
+    """
+    if duration > 60:
+        return caption, lyrics
+    instruction = ('Start singing immediately on the first beat, with clear lead vocals '
+                   'singing the hook throughout this short clip. No instrumental intro, '
+                   'solo, breakdown or long outro. Complete the sung phrase before the end. ')
+    sections: list[tuple[str, list[str]]] = []
+    tag, lines = '[Chorus]', []
+    for line in re.sub(r'(\[[^\]]+\])', r'\n\1\n', lyrics).splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith('[') and line.endswith(']'):
+            if lines:
+                sections.append((tag, lines))
+            tag, lines = line, []
+        elif not re.search(r'intro|outro|instrumental|solo|breakdown|interlude', tag, re.I):
+            lines.append(line)
+    if lines:
+        sections.append((tag, lines))
+    sections.sort(key=lambda section: 0 if re.fullmatch(
+        r'\[\s*(?:(?:final|last)\s+)?(?:chorus|hook)(?:\s+\d+)?\s*\]',
+        section[0], re.I) else 1)
+    remaining = max(1, int(duration * 1.2))
+    chosen = []
+    for _, section_lines in sections:
+        for line in section_lines:
+            words = line.split()
+            if len(words) <= remaining:
+                chosen.append(line)
+                remaining -= len(words)
+            elif not chosen:
+                chosen.append(' '.join(words[:remaining]))
+                remaining = 0
+            else:
+                remaining = 0
+            if not remaining:
+                break
+        if not remaining:
+            break
+    return (caption if caption.startswith(instruction) else instruction + caption,
+            '[Chorus]\n' + '\n'.join(chosen) if chosen else '')
 
 
 def _default_bpm(genre: str, mood: str) -> int:

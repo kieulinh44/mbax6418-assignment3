@@ -20,6 +20,7 @@ const session = { id: null, pollTimer: null, manifest: null, idx: -1 };
 let pendingRemoval = null;
 let libraryTracks = [];
 let removing = false;
+let minVocalDuration = 60;
 const removeDialog = $("remove-dialog");
 
 /* ---------------- theme ---------------- */
@@ -66,6 +67,7 @@ async function boot() {
     fillSelect(els.dj, p.personas.map(x => ({ value: x.id, label: x.label })), "neon_nina");
     els.tracks.max = p.max_tracks;
     els.duration.max = p.max_duration;
+    minVocalDuration = p.min_vocal_duration || 60;
   } catch (e) {
     els.deckStatus.textContent = "Could not load presets: " + e.message;
   }
@@ -74,6 +76,7 @@ async function boot() {
   health();
   refreshLibrary();
   bind();
+  updateDurationLimits();
 }
 
 function fillSelect(sel, entries, def) {
@@ -87,6 +90,7 @@ function fillSelect(sel, entries, def) {
 }
 
 function bind() {
+  els.vocals.addEventListener('change', updateDurationLimits);
   $("remove-cancel").addEventListener("click", () => removeDialog.close());
   removeDialog.addEventListener("close", () => { pendingRemoval = null; });
   removeDialog.addEventListener("cancel", (event) => { if (removing) event.preventDefault(); });
@@ -123,7 +127,18 @@ function bind() {
 
 /* ---------------- jam lifecycle ---------------- */
 
+function updateDurationLimits() {
+  const minimum = els.vocals.checked ? minVocalDuration : 10;
+  els.duration.min = minimum;
+  if (Number(els.duration.value) < minimum) els.duration.value = minimum;
+  els.durationVal.textContent = els.duration.value + 's';
+  $('duration-help').textContent = els.vocals.checked
+    ? `Vocal songs need at least ${minVocalDuration} seconds so the singing has time to start.`
+    : 'Instrumental clips can be as short as 10 seconds.';
+}
+
 async function startJam(single) {
+  updateDurationLimits();
   const options = {
     genre: els.genre.value,
     mood: els.mood.value,

@@ -68,7 +68,7 @@ def main() -> int:
 
     # --- app shell ----------------------------------------------------------
     code, body = http_get(f"{base}/")
-    check("App serves the player UI", code == 200 and b"AI" in body and b"JUKEBOX" in body,
+    check("App serves the player UI", code == 200 and b"jukebox" in body.lower() and b'id="player"' in body,
           f"GET / -> {code}")
 
     # --- class services reachable --------------------------------------------

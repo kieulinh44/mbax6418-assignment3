@@ -90,7 +90,8 @@ app/
   djs.py      DJ script writing (Qwen) + speech (Chatterbox)
   library.py  persistent track library (index + copied artifacts, gitignored)
   jukebox.py  background session builder (playlist manifest)
-  static/     player UI (index.html, style.css, app.js)
+  static/     retro cabinet player UI (index.html, retro.css, app.js)
+    fonts/    locally hosted Barlow + Fraunces fonts and OFL licenses
 scripts/
   smoke_test.py   automated three-feature verification (grader-friendly)
 start.bat / start.sh   one-command launchers (venv + install + run)
@@ -105,6 +106,115 @@ sessions/     generated audio/art/playlists (gitignored)
 | Generate playable audio with ACE-Step | every song is rendered by ACE-Step (9007) — see `app/clients.py:generate_song` |
 | Add it to the library | every generated song is auto-added to the persistent library (`app/library.py`, index in `library/tracks.json`); browsable & playable in the Library panel |
 | Instrumental + vocal tracks, AI lyrics for vocal | "Vocals" toggle; vocal tracks get full Qwen-written lyrics with section tags, shown in the player (🎤 Lyrics) |
+
+## Retro cabinet interface
+
+The interface draws on vintage jukebox materials: walnut grain, brass trim,
+cream record labels, and coral/amber/turquoise fluorescent tubing. Fraunces is
+used for display headings and Barlow for readable controls. Fonts are bundled
+locally under their SIL Open Font Licenses; no font CDN is needed at runtime.
+The Daylight / After hours switch persists the light/dark preference.
+
+The desktop layout separates creation, playback, and the saved collection.
+Tablet and mobile layouts reflow without horizontal scrolling. Keyboard focus,
+a skip link, named playback buttons, live status announcements, accessible
+progress values, and reduced-motion support are included.
+
+### Short vocal songs
+
+Vocal songs now have a visible 60-second minimum in both the UI and API;
+instrumental clips still allow 10 seconds. Switching vocals on raises a shorter
+slider selection to 60 seconds before submission, with an explanation beside
+the control. Direct API requests for shorter vocal songs receive a validation
+error rather than silently changing their duration.
+
+At 60 seconds, songs are composed as compact, hook-first performances with a
+conservative budget of 1.2 sung words per second. Captions request singing from
+the first beat without an instrumental intro, solo or long outro. Before
+rendering, the app prioritizes chorus/hook lines and removes instrumental
+sections; saved lyrics match those submitted to ACE-Step. Longer songs retain
+their full arrangement. Real-audio checks found that prompt changes alone did
+not reliably produce recognizable lyrics in 10–30-second generations, whereas
+both tested 60-second generations contained singing. Music generation remains
+probabilistic; the minimum and arrangement controls are safeguards, not a
+guarantee of exact vocal timing or lyric fidelity. Existing audio is unchanged.
+
+### Title and artist variety
+
+Naming forms rotate independently across genres: titles may be a single word,
+a question, a conversational fragment, a concrete detail, or a plainspoken
+sentence. Fictional artist identities vary between solo performers, mononyms,
+duos, and bands instead of always using the same adjective-noun pattern.
+
+The composer sees recent titles/artists and frequently reused vocabulary from
+the whole collection, not only the chosen genre. A deterministic check rejects
+exact/near duplicates, superficial punctuation/plural/numbered variants, and
+overworked name words. Artist identities also avoid previously used distinctive
+name words/surnames, not just identical full names. Listener-requested subject
+words can still appear in titles. Accepted names are reserved before audio
+generation so pending tracks in a set and simultaneous requests also inform
+later drafts. Saved collection names are reloaded after restarts. Form rotation
+is process-local, as are reservations for the latest 200 accepted specs. An
+accepted name from a subsequently failed session remains reserved until eviction
+or restart.
+
+Conflicting names trigger up to three complete composition drafts, preserving
+the connection between title, lyric hook, and cover scene. There is no post-hoc
+number suffix or random rename of finished audio. Persistent conflicts produce
+an explicit error instead of silently accepting a duplicate. Existing songs
+and artist names are never renamed by this change. These are lexical checks,
+not a guarantee of semantic uniqueness or a worldwide artist-name search.
+
+### Cover-art variety
+
+Every new song receives a varied visual brief before the songwriter creates
+its cover prompt: palette, medium, narrative approach, and a matched composition
+and richness treatment. Compositions rotate between cinematic worlds, surreal
+environments, intricate illustrations, environmental portraits, still-life
+tableaux, landscapes, action scenes, photomontage, and bold graphic designs.
+Most develop layered scenes, lighting, textures and secondary story details;
+the occasional more restrained graphic treatment provides contrast. Covers are
+not all reduced to isolated objects or flat icons on empty backgrounds.
+
+Palette, medium, composition and approach use shuffled pools per genre, shared
+across sets and single-song requests. Richness stays coupled to its composition
+so their instructions agree. Choices are exhausted before reuse, and reshuffling avoids
+immediate repeats. The pools are not tied to genre stereotypes: synthwave can
+receive a linocut, monochrome photograph, textile illustration, or oil painting
+instead of always getting a pink/blue neon cityscape.
+
+The songwriter grounds the scene in the song's theme/story, and the image
+renderer also receives the assigned visual brief. The brief and cover prompt
+are saved with newly generated session/library tracks. Existing covers are not
+changed. Shuffle history is process-local; restarting begins a fresh random
+order. Visual variety is guided, not a guarantee that every AI image is unique.
+
+### Removing collection tracks
+
+Use a song's **Remove** action and confirm its title. Removal deletes the saved
+collection entry and that entry's copied audio/cover files, but preserves the
+original generated DJ-session files. Cancel leaves the song untouched. Removing
+the currently selected library song stops that playback; other songs and session
+playlists are not deleted.
+
+### Regression tests
+
+With the app running on port 8003 (or set `AIJ_TEST_URL` to its URL):
+
+```bash
+uv pip install --python .venv/bin/python -r requirements-dev.txt
+.venv/bin/python -m playwright install chromium
+.venv/bin/python -m unittest discover -s tests -v
+```
+
+Art-direction unit tests check variation, shuffle boundaries, concurrency,
+and propagation into composer, renderer, and saved metadata. Collection-removal
+tests use isolated temporary directories, never the real collection.
+
+The browser tests use explicitly intercepted API fixtures for deterministic
+UI-state checks and a silent WAV for real browser pause/resume testing; they
+do not call the AI services. Use `scripts/smoke_test.py --base URL` separately
+for real end-to-end music, cover art, and DJ generation.
 
 ## Credentials & safeguards
 
