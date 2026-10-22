@@ -48,7 +48,7 @@ Windows/macOS copy commands, restart requirement and environment precedence.
 | Check | Inputs and expected result | Actual result |
 |---|---|---|
 | Vocal songs and covers | Pop, happy, 60 seconds, vocals enabled, three songs, theme “small moments of courage on the way home”; expect original lyrics, playable music and matching FLUX files | Three MP3s and three PNGs generated using class Qwen/ACE-Step/FLUX; available in the library and bundled in `samples/` |
-| Singing evidence | Transcribe each sample without providing the expected lyrics; expect recognizable generated words | Local faster-whisper tiny.en recovered lyric phrases from all three; approximate excerpts below. Human lyric fidelity/listening review remains pending |
+| Singing evidence | Transcribe each sample without providing the expected lyrics; expect recognizable generated words | Local faster-whisper tiny.en recovered lyric phrases from all three; approximate excerpts below. **Human listening (2026-10-22): a teammate confirmed audible singing vocals on the fresh 60-second "Neon Asphalt" generation (session 16546f8b6c98).** Lyric fidelity for the three bundled samples still awaits a second listener |
 | Final vocal jam | Vocal request via smoke test: synthwave, energetic, 110 BPM, 60 seconds, one song, Chill Charlie; expect lyrics, music, cover and complete DJ queue | Live smoke test passed 9/9 checks; session `b63ec8cbb9c7` completed without manual recovery |
 | Full instrumental jam | Synthwave, energetic, 110 BPM, 10 seconds, two instrumental songs, Chill Charlie; expect songs, covers, default DJ speech, library entries and ordered manifest | Live smoke test passed 9/9 checks; session `0a774b1a40ca`, playlist intro → chat → song → chat → song → outro |
 | Voice-reference jam | Jazz, chill, 10 seconds, one instrumental song, app-generated DJ intro used as MP3 reference; expect Chatterbox-generated clips with no reference file saved | Session `27c24d85d881` reached ready; three generated DJ clips and song/cover returned. This verifies the request path, not perceived voice similarity |
@@ -101,9 +101,10 @@ the required teammate check.
 
 See README for setup and manual exercises. The following final checks must be
 completed by the team (each is a task for a person, not an automated claim):
-listen to the samples and a fresh vocal song, check perceived custom-voice
+listen to the three bundled samples, check perceived custom-voice
 similarity, test automatic DJ/music playback and skip over a complete set, and
-have a teammate run the GitHub-downloaded ZIP from scratch. The Playwright
+have a teammate run the GitHub-downloaded ZIP from scratch. (Listening for the
+fresh 60-second vocal generation is done — confirmed singing, 2026-10-22.) The Playwright
 browser suite is now executed and green on the review machine; a teammate
 running it on a second machine would strengthen the record.
 
