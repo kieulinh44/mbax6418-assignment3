@@ -9,7 +9,7 @@ const els = {
   duration: $("duration"), durationVal: $("duration-val"), dj: $("dj"),
   jamBtn: $("jam-btn"), playBtn: $("play-btn"), deckStatus: $("deck-status"),
   art: $("art"), artFallback: $("art-fallback"), vinyl: $("vinyl"),
-  kind: $("kind"), title: $("title"), artist: $("artist"), bar: $("bar"),
+  kind: $("kind"), title: $("title"), artist: $("artist"), bar: $("bar"), progressTrack: $("progress-track"),
   player: $("player"), queue: $("queue"), lights: $("status-lights"),
   singleBtn: $("single-btn"), libraryList: $("library-list"),
   lyricsBox: $("lyrics-box"), lyricsText: $("lyrics-text"),
@@ -104,6 +104,8 @@ function bind() {
   els.singleBtn.addEventListener("click", () => startJam(true));
   els.playBtn.addEventListener("click", playSet);
   els.pauseBtn.addEventListener("click", togglePause);
+  els.progressTrack.addEventListener("click", seekFromPointer);
+  els.progressTrack.addEventListener("keydown", seekFromKeyboard);
   els.player.addEventListener("ended", onEnded);
   els.player.addEventListener("play", () => {
     els.pauseBtn.textContent = "Ⅱ Pause";
@@ -238,6 +240,37 @@ function togglePause() {
   } else {
     els.player.pause();
   }
+}
+
+function seekFromPointer(event) {
+  const rect = els.progressTrack.getBoundingClientRect();
+  seekTo(AIJPlayback.seekTime(event.clientX, rect.left, rect.width, els.player.duration));
+}
+
+function seekFromKeyboard(event) {
+  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+  event.preventDefault();
+  const duration = els.player.duration;
+  if (!duration) return;
+  const step = Math.max(duration / 100, 1);
+  let time = els.player.currentTime;
+  if (event.key === "ArrowLeft") time -= step;
+  if (event.key === "ArrowRight") time += step;
+  if (event.key === "Home") time = 0;
+  if (event.key === "End") time = duration;
+  seekTo(time);
+}
+
+function seekTo(time) {
+  if (time === null || !Number.isFinite(time)) return;
+  els.player.currentTime = time;
+  setProgress(els.player.duration ? time / els.player.duration * 100 : 0);
+  els.pauseBtn.hidden = false;
+  els.player.play().catch(() => {
+    els.deckStatus.textContent = "Position selected — press Resume to play.";
+    els.playBtn.hidden = false;
+    els.playBtn.textContent = "▶ Resume";
+  });
 }
 
 function onEnded() {

@@ -152,7 +152,8 @@ input[type="checkbox"] { width: 21px; height: 21px; accent-color: var(--accent);
 .playback-console { padding: 17px 0 10px; }
 .deck-status { font-size: 13px; line-height: 1.5; min-height: 38px; text-align: center; color: var(--muted); overflow-wrap: anywhere; }
 .deck-status .spin { color: var(--aqua); }.deck-status .err { color: var(--err); }.deck-status .warn { color: var(--warn); }
-.progress { height: 5px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; margin-top: 9px; }
+.progress { height: 5px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; margin-top: 9px; cursor: pointer; }
+.progress:focus-visible { outline: 2px solid var(--aqua); outline-offset: 4px; }
 .bar { height: 100%; width: 0; background: var(--aqua); transition: width .2s; }
 .transport { display: flex; gap: 10px; margin-top: 12px; }
 .transport:has(> :not([hidden])) { margin-bottom: 7px; }
