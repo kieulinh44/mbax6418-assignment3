@@ -41,20 +41,36 @@ third-party content — everything the app needs comes from the class endpoints.
 
 1. **Unzip** the submission. (No `.env`, no `sessions/` — by design.)
 2. **Create the environment** (once):
-   - Windows: `python -m venv .venv`
-   - macOS/Linux: `python3 -m venv .venv`
+   - macOS/Linux: Python 3.11+ (`python3.11 -m venv .venv`)
+   - Windows: Python 3.11+ (`py -3.11 -m venv .venv`)
 3. **Install dependencies**:
    - Windows: `.venv\Scripts\python -m pip install -r requirements.txt`
    - macOS/Linux: `.venv/bin/python -m pip install -r requirements.txt`
-4. **Credentials**: copy `.env.example` to `.env` and set `AIJ_API_KEY` to the
-   key from `class-endpoints.txt` (or export it as an environment variable).
-5. **Run**:
+4. **Create the local configuration file**:
+   ```bash
+   cp .env.example .env
+   ```
+   Edit `.env` and replace the dummy `AIJ_API_KEY` value with the class key. The
+   application loads this root-level `.env` automatically at startup; do not run
+   `source .env`.
+5. **Configuration values**:
+   - Required: `AIJ_API_KEY` — obtain it from the MBAX 6418 class service instructions.
+   - Optional URL overrides: `AIJ_CHAT_BASE_URL`, `AIJ_ART_BASE_URL`,
+     `AIJ_MUSIC_BASE_URL`, and `AIJ_TTS_BASE_URL`. Each must begin with `http://`
+     or `https://`.
+   - Optional model/voice overrides: `AIJ_CHAT_MODEL`, `AIJ_ART_MODEL`,
+     `AIJ_MUSIC_MODEL`, `AIJ_MUSIC_LM_MODEL`, and `AIJ_TTS_MODEL`/`AIJ_TTS_VOICE`.
+   - Optional `AIJ_PORT` defaults to `8000` and must be between 1 and 65535.
+   - Values exported in the shell override values from `.env`.
+   - `.env.example` contains placeholders only. Never commit `.env` or put real
+     credentials in code, logs, screenshots, tests, or documentation.
+6. **Run**:
    - Windows: double-click `start.bat`
    - macOS/Linux: `./start.sh`
-   - or directly: `python -m uvicorn app.main:app --port 8000`
+   - or directly: `.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000`
    - Port override: set `AIJ_PORT` (e.g. `AIJ_PORT=8080`).
-6. **Open** http://127.0.0.1:8000 — the four header lights should be green.
-7. **Test the three core features** — either from the UI (pick a vibe, hit
+7. **Open** http://127.0.0.1:8000 — the four header lights should be green.
+8. **Test the three core features** — either from the UI (pick a vibe, hit
    "Start the jam": songs + covers + DJ commentary in one set), or automated:
 
    ```bash
@@ -69,9 +85,11 @@ third-party content — everything the app needs comes from the class endpoints.
 ## Run (developer shorthand)
 
 ```bash
-python -m venv .venv
-.venv/Scripts/python -m pip install -r requirements.txt
-.venv/Scripts/python -m uvicorn app.main:app --port 8000
+python3.11 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+cp .env.example .env
+# Edit .env and replace the dummy AIJ_API_KEY value.
+.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
 Open http://localhost:8000 — status lights in the header show whether all four
@@ -230,13 +248,22 @@ UI-state checks and a silent WAV for real browser pause/resume testing; they
 do not call the AI services. Use `scripts/smoke_test.py --base URL` separately
 for real end-to-end music, cover art, and DJ generation.
 
-## Credentials & safeguards
+## Credentials & configuration safeguards
 
-- **Credentials are server-side only.** Copy `.env.example` to `.env` and fill in
-  `AIJ_API_KEY`; the app reads it from the environment at runtime. `.env` is
-  gitignored — never commit it, and never put a real key in code, docs, logs,
-  or browser scripts. The UI talks to this server, which holds the key; the
-  browser never sees it.
+- **Credentials are server-side only.** Copy `.env.example` to `.env`, replace the
+  dummy `AIJ_API_KEY`, and restart the app. The root-level `.env` is loaded
+  automatically by `app/config.py`; manual `source .env` is not required.
+- **Environment precedence is explicit.** If the same variable is exported in the
+  shell, that value overrides `.env`.
+- **Configuration validation is safe.** Startup reports the variable name and the
+  required format for missing keys, malformed URLs, or invalid ports, but never
+  prints the supplied key, password, or complete secret value.
+- **Keep local credentials private.** `.env` is gitignored and `.env.example`
+  contains placeholders only. Never put real credentials in code, logs, screenshots,
+  tests, documentation, or browser scripts.
+- **Diagnosis:** check that `.env` is at the repository root, confirm its key names
+  match `.env.example`, restart the server, and inspect only the variable names and
+  non-secret validation message. Do not paste the file or key into an issue/chat.
 - **No user uploads or voice-reference recordings** are accepted or stored.
   The DJ voice is Chatterbox's bundled voice — no reference-audio cloning.
   All generated output lives in `sessions/` (gitignored) and is never committed.

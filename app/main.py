@@ -4,6 +4,7 @@ Run:  .venv/Scripts/python -m uvicorn app.main:app --port 8000
 """
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -16,7 +17,14 @@ from .clients import SESSION
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
-app = FastAPI(title="AI Jukebox", version="0.2.0")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    config.validate_config()
+    yield
+
+
+app = FastAPI(title="AI Jukebox", version="0.2.0", lifespan=lifespan)
 
 app.mount("/sessions", StaticFiles(directory=jukebox.SESSIONS_DIR), name="sessions")
 app.mount("/library", StaticFiles(directory=library.LIBRARY_DIR), name="library")
