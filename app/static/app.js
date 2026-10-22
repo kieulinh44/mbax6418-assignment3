@@ -12,6 +12,7 @@ const els = {
   kind: $("kind"), title: $("title"), artist: $("artist"), bar: $("bar"), progressTrack: $("progress-track"),
   player: $("player"), queue: $("queue"), lights: $("status-lights"),
   singleBtn: $("single-btn"), libraryList: $("library-list"),
+  libraryGenre: $("library-genre"),
   lyricsBox: $("lyrics-box"), lyricsText: $("lyrics-text"),
   libraryCount: $("library-count"), pauseBtn: $("pause-btn"),
   previousBtn: $("previous-btn"), nextBtn: $("next-btn"),
@@ -99,6 +100,7 @@ function bind() {
   removeDialog.addEventListener("close", () => { pendingRemoval = null; });
   removeDialog.addEventListener("cancel", (event) => { if (removing) event.preventDefault(); });
   $("remove-confirm").addEventListener("click", confirmRemoval);
+  els.libraryGenre.addEventListener("change", () => renderLibrary(libraryTracks));
   els.bpm.addEventListener("input", () =>
     els.bpmVal.textContent = els.bpm.value === "0" ? "auto" : els.bpm.value + " BPM");
   els.tracks.addEventListener("input", () => els.tracksVal.textContent = els.tracks.value);
@@ -417,6 +419,26 @@ function renderLibrary(tracks) {
   libraryTracks = tracks;
   els.libraryCount.textContent = tracks.length ? `(${tracks.length})` : "";
   els.libraryList.innerHTML = "";
+  const previousGenre = els.libraryGenre.value || "all";
+  const groups = new Map();
+  for (const track of tracks) {
+    const rawGenre = track.set_genre || (Array.isArray(track.genre) ? track.genre[0] : track.genre) || "Other";
+    const label = String(rawGenre).trim() || "Other";
+    const key = label.toLocaleLowerCase();
+    if (!groups.has(key)) groups.set(key, { label, tracks: [] });
+    groups.get(key).tracks.push(track);
+  }
+  const orderedGroups = [...groups.entries()].sort((a, b) =>
+    a[1].label.localeCompare(b[1].label, undefined, { sensitivity: "base" }));
+  els.libraryGenre.innerHTML = `<option value="all">All genres (${tracks.length})</option>`;
+  for (const [key, group] of orderedGroups) {
+    const option = document.createElement("option");
+    option.value = key;
+    option.textContent = `${group.label} (${group.tracks.length})`;
+    els.libraryGenre.appendChild(option);
+  }
+  els.libraryGenre.value = groups.has(previousGenre) || previousGenre === "all" ? previousGenre : "all";
+  els.libraryGenre.disabled = !tracks.length;
   if (!tracks.length) {
     const li = document.createElement("li");
     li.className = "empty";
@@ -424,29 +446,39 @@ function renderLibrary(tracks) {
     els.libraryList.appendChild(li);
     return;
   }
-  for (const t of tracks) {
-    const li = document.createElement("li");
-    const thumb = t.art_url
-      ? `<img class="thumb" src="${t.art_url}" alt=""/>`
-      : `<span class="thumb no-art">♪</span>`;
-    const vocal = t.vocals
-      ? '<span class="chip vocal">vocal</span>'
-      : '<span class="chip inst">instrumental</span>';
-    li.innerHTML =
-      `${thumb}<div class="tt"><div class="t">${escapeHtml(t.title)}</div>` +
-      `<div class="a">${escapeHtml(t.artist)}</div>` +
-      `<div class="track-meta"><span class="chip">${t.bpm || "?"} BPM</span>${vocal}</div></div>` +
-      `<div class="track-actions"><button class="mini play-li" aria-label="Play ${escapeHtml(t.title)}" title="Play ${escapeHtml(t.title)}">▶</button>` +
-      `<button class="remove-li" aria-label="Remove ${escapeHtml(t.title)}">Remove</button></div>`;
-    li.querySelector(".play-li").addEventListener("click", () => playLibraryTrack(t));
-    li.querySelector(".remove-li").addEventListener("click", () => {
-      pendingRemoval = t;
-      $("remove-title").textContent = t.title;
-      $("remove-status").textContent = "";
-      removeDialog.showModal();
-      $("remove-cancel").focus();
-    });
-    els.libraryList.appendChild(li);
+  const visibleGroups = els.libraryGenre.value === "all"
+    ? orderedGroups
+    : orderedGroups.filter(([key]) => key === els.libraryGenre.value);
+  for (const [, group] of visibleGroups) {
+    const heading = document.createElement("li");
+    heading.className = "genre-heading";
+    heading.innerHTML = `<h3>${escapeHtml(group.label)}</h3><span>${group.tracks.length} ${group.tracks.length === 1 ? "record" : "records"}</span>`;
+    els.libraryList.appendChild(heading);
+    for (const t of group.tracks) {
+      const li = document.createElement("li");
+      li.className = "library-track";
+      const thumb = t.art_url
+        ? `<img class="thumb" src="${t.art_url}" alt=""/>`
+        : `<span class="thumb no-art">♪</span>`;
+      const vocal = t.vocals
+        ? '<span class="chip vocal">vocal</span>'
+        : '<span class="chip inst">instrumental</span>';
+      li.innerHTML =
+        `${thumb}<div class="tt"><div class="t">${escapeHtml(t.title)}</div>` +
+        `<div class="a">${escapeHtml(t.artist)}</div>` +
+        `<div class="track-meta"><span class="chip">${t.bpm || "?"} BPM</span>${vocal}</div></div>` +
+        `<div class="track-actions"><button class="mini play-li" aria-label="Play ${escapeHtml(t.title)}" title="Play ${escapeHtml(t.title)}">▶</button>` +
+        `<button class="remove-li" aria-label="Remove ${escapeHtml(t.title)}">Remove</button></div>`;
+      li.querySelector(".play-li").addEventListener("click", () => playLibraryTrack(t));
+      li.querySelector(".remove-li").addEventListener("click", () => {
+        pendingRemoval = t;
+        $("remove-title").textContent = t.title;
+        $("remove-status").textContent = "";
+        removeDialog.showModal();
+        $("remove-cancel").focus();
+      });
+      els.libraryList.appendChild(li);
+    }
   }
 }
 
