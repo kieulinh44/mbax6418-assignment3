@@ -22,9 +22,22 @@ optional voice references use the documented Chatterbox `ref_audio` request fiel
 
 ## Automated checks
 
-47 Python unit/API regressions and five Node playback regressions passed.
+50 Python unit/API regressions and five Node playback regressions passed.
 JavaScript syntax and Git whitespace checks passed. These mock-based tests are
 separate from the live service checks below.
+
+## File-based configuration regression
+
+The README's copy-and-edit `.env` path is explicitly tested. In a temporary copy of
+`app/config.py`, `app/clients.py`, and the real `.env.example`, three fresh-process
+tests verify: (1) dummy file credentials and all four endpoint overrides load with
+no exported `AIJ_*` variables, even from a different working directory; (2) existing
+environment variables override the file; and (3) an unrelated working directory's
+`.env` is ignored when the project file is absent. The first two tests also check
+the actual requests session's Authorization header. All three pass without class
+service calls or real secrets. `python-dotenv` is required in both dependency files;
+its import no longer silently fails. The README specifies the file location,
+Windows/macOS copy commands, restart requirement and environment precedence.
 
 ## Actual results
 

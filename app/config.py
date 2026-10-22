@@ -9,11 +9,12 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-try:  # optional .env support
-    from dotenv import load_dotenv
-    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-except ImportError:  # pragma: no cover
-    pass
+from dotenv import load_dotenv
+
+# Resolve from the app location, never the shell's working directory. This runs
+# before any settings or the HTTP client's Authorization header are constructed.
+# python-dotenv is a required dependency: do not silently ignore a broken install.
+load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
 
 # --- Class services (verified against live endpoints) -------------------------
 CHAT_BASE_URL = os.environ.get("AIJ_CHAT_BASE_URL", "http://dobolyi.com:9001/v1")

@@ -53,8 +53,17 @@ the local library on first launch, so playback is available before generation.
    - macOS/Linux: `.venv/bin/python -m pip install -r requirements.txt`
    For the exact versions tested on Python 3.12, use `-r requirements-lock.txt`
    instead of `-r requirements.txt`.
-4. **Credentials**: copy `.env.example` to `.env` and set `AIJ_API_KEY` to the
-   key from `class-endpoints.txt` (or export it as an environment variable).
+4. **Credentials**: create `.env` in the extracted project folder, beside
+   `README.md`, by copying the supplied template:
+   - Windows Command Prompt: `copy .env.example .env`
+   - macOS/Linux: `cp .env.example .env`
+   Edit `.env` and replace `your-class-api-key-here` with the key from
+   `class-endpoints.txt`; uncomment endpoint overrides only if needed. The filename
+   must be `.env`, not `.env.txt`. No shell export is required. `app/config.py`
+   loads this exact file with the required `python-dotenv` dependency before the
+   HTTP clients read their settings. Restart the server after editing it.
+   Existing environment variables take precedence over `.env`; unset stale
+   exported values when checking file-based configuration.
 5. **Run**:
    - Windows: double-click `start.bat`
    - macOS/Linux: `./start.sh`
@@ -227,7 +236,8 @@ for real end-to-end music, cover art, and DJ generation.
 ## Credentials & safeguards
 
 - **Credentials are server-side only.** Copy `.env.example` to `.env` and fill in
-  `AIJ_API_KEY`; the app reads it from the environment at runtime. `.env` is
+  `AIJ_API_KEY`; the app explicitly loads this project-root file before constructing
+  its server-side HTTP clients. No shell export is needed. `.env` is
   gitignored — never commit it, and never put a real key in code, docs, logs,
   or browser scripts. The UI talks to this server, which holds the key; the
   browser never sees it.
@@ -279,3 +289,13 @@ Push the reviewed version through the team's GitHub issue/PR process, record the
 submitted commit ID, and download the ZIP from GitHub for that same commit. Submit
 that link, commit ID, and GitHub ZIP together. A local preview ZIP is not evidence
 that the same version has been published on GitHub.
+
+### Verify file-based configuration
+
+Run `python -m unittest discover -s tests -p test_config.py -v` after installing
+`requirements.txt`. These tests copy the real template into an isolated project,
+fill it with dummy values, clear inherited `AIJ_*` variables, and start a fresh
+Python process from another folder. They verify the key, all four endpoint URLs,
+and the server-side Authorization header; check environment-variable precedence;
+and ensure an unrelated working directory's `.env` is ignored. They never read,
+print, or transmit your real credentials.
