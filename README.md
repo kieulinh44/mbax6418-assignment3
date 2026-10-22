@@ -27,7 +27,7 @@ A "jam" session is one customizable set:
    BPM/key/time signature, cover-art prompt) *and* the DJ's spoken script.
 3. **ACE-Step** generates each song's audio; **FLUX** paints the matching cover art.
 4. **Chatterbox** speaks the DJ persona's intro, interludes, and outro.
-5. The browser plays the whole set back-to-back: intro → song → DJ chat → song → … → outro.
+5. The browser plays the whole set back-to-back: intro → DJ chat → song → DJ chat → song → … → outro.
 
 Sessions are generated in a background thread; the page polls progress and plays when ready.
 Artifacts live in `sessions/<id>/` (gitignored) alongside a `manifest.json` playlist.

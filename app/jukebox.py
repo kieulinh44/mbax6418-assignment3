@@ -154,14 +154,15 @@ def _build(sid: str, options: dict, total: int) -> None:
                 "meta": {},
             }]
             for i, t in enumerate(tracks):
-                playlist.append(t)
+                # DJ introduces the upcoming track, then the song plays
                 playlist.append({
                     "kind": "chat",
-                    "title": "DJ interlude",
+                    "title": "DJ intro",
                     "artist": persona,
                     "audio": f"/sessions/{sid}/dj_chat_{i + 1}.mp3",
                     "meta": {},
                 })
+                playlist.append(t)
             playlist.append({
                 "kind": "outro",
                 "title": "Thanks for listening",

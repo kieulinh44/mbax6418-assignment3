@@ -86,7 +86,7 @@ def main() -> int:
         "genre": "synthwave",
         "mood": "energetic",
         "bpm": 110,
-        "theme": "automated smoke test",
+        "theme": "crimson fox racing a neon comet across the desert",
         "vocals": False,
         "tracks": args.tracks,
         "duration_sec": max(10, args.duration),
@@ -184,9 +184,8 @@ def main() -> int:
 
     # --- playback order -------------------------------------------------------------
     order = [i["kind"] for i in playlist]
-    expected = ["intro"] + ["song", "chat"] * len(songs)
-    expected = expected[: len(songs) * 2 + 1] + ["outro"]
-    check("Playlist order: intro -> song -> DJ chat -> ... -> outro",
+    expected = ["intro"] + ["chat", "song"] * len(songs) + ["outro"]
+    check("Playlist order: intro -> DJ chat -> song -> ... -> outro",
           order == expected, " -> ".join(order))
 
     return _summary()
