@@ -82,8 +82,11 @@ class SubmissionFixTests(unittest.TestCase):
         self.assertEqual([t['kind'] for t in session['manifest']['playlist']], ['intro', 'chat', 'song', 'outro'])
         self.assertEqual(added, 1)
 
-    def test_empty_cover_fails_instead_of_claiming_success(self):
+    def test_empty_cover_is_nonfatal_and_song_still_builds(self):
+        # Reconciled with teammates' lyric-order suite (2026-10-22): a failed
+        # FLUX cover must not kill the whole set — the song stays playable.
         session, added = self.build(b'')
-        self.assertEqual(session['state'], 'error')
-        self.assertIn('empty cover', session['error'])
-        self.assertEqual(added, 0)
+        self.assertEqual(session['state'], 'ready')
+        self.assertEqual([t['kind'] for t in session['manifest']['playlist']], ['intro', 'chat', 'song', 'outro'])
+        self.assertEqual(session['manifest']['tracks'][0]['art'], '')
+        self.assertEqual(added, 1)

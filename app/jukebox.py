@@ -102,9 +102,11 @@ def _build(sid: str, options: dict, total: int, reference_audio: bytes | None = 
             (sdir / f"song_{i + 1}.mp3").write_bytes(audio)
             steps += 1
             _update(sid, progress={"stage": f"painting cover {i + 1}/{total}", "done": steps})
-            cover = art_mod.cover_for(spec)
-            if not cover:
-                raise RuntimeError("FLUX returned an empty cover. Please try generating again.")
+            try:
+                cover = art_mod.cover_for(spec)
+            except Exception as exc:  # noqa: BLE001 - cover is non-fatal
+                log.warning("cover failed for %s: %s", spec.get("title"), exc)
+                cover = b""
             if cover:
                 (sdir / f"cover_{i + 1}.png").write_bytes(cover)
             tracks.append({
