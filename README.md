@@ -270,11 +270,6 @@ for real end-to-end music, cover art, and DJ generation.
 - **No third-party music, lyrics, cover art, or voice samples are bundled.**
   Every song, cover, and DJ clip is generated at runtime by the class services.
 
-## Git workflow
-
-Work happens on personal branches (e.g. `LN-Branch`); `main` is kept stable and only
-changes via an agreed merge/PR. Nothing here is pushed anywhere without approval.
-
 ## Design judgment
 
 **Choice: enforce a structural minimum for vocal tracks instead of relying on prompts alone.**
@@ -309,12 +304,3 @@ recorded in `samples/manifest.json` in the full repository.
 
 ![Interface and connected class services](docs/screenshots/interface.png)
 ![Generated sample songs and covers in the collection](docs/screenshots/collection.png)
-
-## Final submission steps
-
-Review [the verification report](docs/verification.md) and [the retained starter
-prompt](docs/starter-prompt.md). Have a teammate extract a fresh ZIP, follow the setup
-instructions using class credentials, and record their actual results. Each teammate
-must contribute and review a teammate's work. Record the submitted commit ID and
-download the ZIP from GitHub for that same commit; submit the repository link,
-commit ID, and GitHub ZIP together.
