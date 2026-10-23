@@ -1,0 +1,46 @@
+MBAX 6418 Assignment 3 - class AI service endpoints
+====================================================
+
+These are the class services the AI Jukebox uses. The app reads them from
+environment variables (see app/config.py); the values below are the built-in
+defaults, so no configuration is needed unless they change.
+
+1. Qwen 3.6-35B (lyrics, song specs, DJ scripts)
+   Base URL:  http://dobolyi.com:9001/v1
+   Request:   POST /chat/completions
+   Model:     cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit
+
+2. FLUX.2 klein (cover art)
+   Base URL:  http://dobolyi.com:9006/v1
+   Request:   POST /images/generations
+   Model:     black-forest-labs/FLUX.2-klein-4B
+
+3. ACE-Step 1.5 XL Turbo (music)
+   Base URL:  http://dobolyi.com:9007
+   Requests:  POST /release_task -> POST /query_result -> GET /v1/audio?path=...
+   Model:     acestep-v15-xl-turbo
+
+4. Chatterbox Multilingual V3 (DJ voice)
+   Base URL:  http://dobolyi.com:9008/v1
+   Request:   POST /audio/speech
+   Model:     chatterbox-v3
+
+Authentication
+--------------
+All four services authenticate with the same class API key, sent as:
+    Authorization: Bearer <AIJ_API_KEY>
+
+Where to get the key:
+- It is posted on the course page (Canvas / class materials).
+- If it is unavailable there, ask a teammate.
+
+How to supply it (NEVER commit or share the real key):
+1. Copy .env.example to .env in the repo root.
+2. Set AIJ_API_KEY=<your key> in that .env file.
+   The app loads .env automatically (see app/config.py).
+3. Or export it as an environment variable before starting the app:
+     export AIJ_API_KEY=<your key>
+   (macOS / Linux)   set AIJ_API_KEY=<your key>   (Windows Command Prompt)
+
+`.env` is gitignored and must never be committed. Use the placeholder value in
+`.env.example` for any configuration examples in documentation.

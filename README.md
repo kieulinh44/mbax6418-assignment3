@@ -274,3 +274,47 @@ for real end-to-end music, cover art, and DJ generation.
 
 Work happens on personal branches (e.g. `LN-Branch`); `main` is kept stable and only
 changes via an agreed merge/PR. Nothing here is pushed anywhere without approval.
+
+## Design judgment
+
+**Choice: enforce a structural minimum for vocal tracks instead of relying on prompts alone.**
+ACE-Step does not reliably put recognizable singing into very short generations, so the app
+makes the guarantee structural rather than linguistic: vocal songs require at least 60 seconds
+(enforced in both the UI and the API), and short vocal clips are composed as hook-first,
+chorus-led arrangements with a conservative sung-word budget. Evidence: real-audio checks found
+no recognizable lyrics in 10–30-second generations, while both tested 60-second generations
+contained singing (see "Short vocal songs"). Caveat: music generation remains probabilistic; the
+minimum and arrangement controls reduce, not eliminate, exact lyric-fidelity failures.
+
+**Limitation investigated: short vocal clips come back instrumental.** Testing showed the
+failure was driven by clip length, not prompt wording, so the app structurally prevents the bad
+case (60-second minimum, hook-first short arrangement). A second issue investigated (DJ scripts
+with the wrong number of spoken intros) surfaces as an explicit generation failure instead of a
+broken queue: songs already generated stay in the library, and the session reports an
+understandable error rather than playing a malformed set.
+
+## Samples and interface evidence
+
+Three 60-second pop sample songs with covers were composed by Qwen, rendered by ACE-Step, and
+painted by FLUX on October 22, 2026 for the submission (titles: "Pocket Light" by Elara Vane,
+"Did You Look Up?" by Hollow Creek, "I held my breath for one more step" by The Quiet
+Departure). How they were generated: one **Start the jam** click with pop / happy / 60 seconds /
+vocals on / theme "small moments of courage on the way home"; Qwen wrote each song's production
+spec (title, fictional artist, original lyrics, music caption, cover prompt); ACE-Step rendered
+each 60-second MP3; FLUX painted each cover. An independent transcription check recovered
+recognizable lyric phrases from all three (excerpts in `docs/verification.md`). Exact lyric
+fidelity remains probabilistic — a human listening review is the final check. The generating
+session id, per-service provenance, options, lyrics, cover prompts, BPM/key and seeds are
+recorded in `samples/manifest.json` in the full repository.
+
+![Interface and connected class services](docs/screenshots/interface.png)
+![Generated sample songs and covers in the collection](docs/screenshots/collection.png)
+
+## Final submission steps
+
+Review [the verification report](docs/verification.md) and [the retained starter
+prompt](docs/starter-prompt.md). Have a teammate extract a fresh ZIP, follow the setup
+instructions using class credentials, and record their actual results. Each teammate
+must contribute and review a teammate's work. Record the submitted commit ID and
+download the ZIP from GitHub for that same commit; submit the repository link,
+commit ID, and GitHub ZIP together.
